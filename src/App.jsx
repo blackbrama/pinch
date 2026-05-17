@@ -4,69 +4,31 @@ import {
   ArrowLeft,
   Bell,
   Camera,
+  ChevronRight,
   Heart,
+  History,
+  Info,
+  Leaf,
   Lock,
   RefreshCcw,
   Scale,
-  Search
+  Search,
+  ShieldCheck,
+  Sparkles
 } from "lucide-react";
 
 const ADDITIVE_DATABASE = {
-  e102: {
-    name: "Tartrazine",
-    risk: "high",
-    concerns: ["allergen", "hyperactivity"]
-  },
-  e110: {
-    name: "Sunset Yellow",
-    risk: "high",
-    concerns: ["allergen", "hyperactivity"]
-  },
-  e129: {
-    name: "Allura Red",
-    risk: "high",
-    concerns: ["allergen", "hyperactivity"]
-  },
-  e250: {
-    name: "Sodium nitrite",
-    risk: "moderate",
-    concerns: ["cancer concern"]
-  },
-  e251: {
-    name: "Sodium nitrate",
-    risk: "moderate",
-    concerns: ["cancer concern"]
-  },
-  e320: {
-    name: "BHA",
-    risk: "high",
-    concerns: ["carcinogenic concern"]
-  },
-  e321: {
-    name: "BHT",
-    risk: "high",
-    concerns: ["carcinogenic concern"]
-  },
-  e621: {
-    name: "Monosodium glutamate",
-    risk: "moderate",
-    concerns: ["sensitivity"]
-  },
-  e627: {
-    name: "Disodium guanylate",
-    risk: "moderate",
-    concerns: ["sensitivity"]
-  },
-  e631: {
-    name: "Disodium inosinate",
-    risk: "moderate",
-    concerns: ["sensitivity"]
-  },
-  e635: {
-    name: "Disodium 5-ribonucleotide",
-    risk: "moderate",
-    concerns: ["sensitivity"]
-  }
+  e102: { name: "Tartrazine", risk: "high", concerns: ["allergen", "hyperactivity"] },
+  e110: { name: "Sunset Yellow", risk: "high", concerns: ["allergen", "hyperactivity"] },
+  e129: { name: "Allura Red", risk: "high", concerns: ["allergen", "hyperactivity"] },
+  e250: { name: "Sodium nitrite", risk: "moderate", concerns: ["cancer concern"] },
+  e251: { name: "Sodium nitrate", risk: "moderate", concerns: ["cancer concern"] },
+  e320: { name: "BHA", risk: "high", concerns: ["carcinogenic concern"] },
+  e321: { name: "BHT", risk: "high", concerns: ["carcinogenic concern"] },
+  e621: { name: "Monosodium glutamate", risk: "moderate", concerns: ["sensitivity"] },
+  e627: { name: "Disodium guanylate", risk: "moderate", concerns: ["sensitivity"] },
+  e631: { name: "Disodium inosinate", risk: "moderate", concerns: ["sensitivity"] },
+  e635: { name: "Disodium 5-ribonucleotide", risk: "moderate", concerns: ["sensitivity"] }
 };
 
 const DEMO_PRODUCTS = [
@@ -475,12 +437,7 @@ function normaliseAdditiveTag(tag) {
 }
 
 function getProductName(product) {
-  return (
-    product.product_name ||
-    product.product_name_en ||
-    product.generic_name ||
-    "Unknown product"
-  );
+  return product.product_name || product.product_name_en || product.generic_name || "Unknown product";
 }
 
 function getProductBrand(product) {
@@ -502,38 +459,46 @@ function getIngredientText(product) {
 
 function getEnergyKcal(product) {
   const nutriments = product.nutriments || {};
-
   const directKcal =
     nutriments["energy-kcal_100g"] ||
     nutriments.energy_kcal_100g ||
     nutriments.energy_kcal ||
     0;
 
-  if (directKcal) {
-    return Number(directKcal);
-  }
+  if (directKcal) return Number(directKcal);
 
   const energyKj = nutriments.energy_100g || 0;
-
-  if (energyKj) {
-    return Number(energyKj) / 4.184;
-  }
+  if (energyKj) return Number(energyKj) / 4.184;
 
   return 0;
 }
 
 function getSalt(product) {
   const nutriments = product.nutriments || {};
-
-  if (nutriments.salt_100g) {
-    return Number(nutriments.salt_100g);
-  }
-
-  if (nutriments.sodium_100g) {
-    return Number(nutriments.sodium_100g) * 2.5;
-  }
-
+  if (nutriments.salt_100g) return Number(nutriments.salt_100g);
+  if (nutriments.sodium_100g) return Number(nutriments.sodium_100g) * 2.5;
   return 0;
+}
+
+function getProductKind(product) {
+  const categoryText = [
+    product.product_type || "",
+    product.categories || "",
+    ...(product.categories_tags || [])
+  ]
+    .join(" ")
+    .toLowerCase();
+
+  if (
+    categoryText.includes("beauty") ||
+    categoryText.includes("cosmetic") ||
+    categoryText.includes("personal care") ||
+    categoryText.includes("hygiene")
+  ) {
+    return "cosmetic";
+  }
+
+  return "food";
 }
 
 function calculateFoodScore(product) {
@@ -557,11 +522,7 @@ function calculateFoodScore(product) {
   );
   const salt = getSalt(product);
   const fibre = Number(nutriments.fiber_100g || nutriments.fibre_100g || 0);
-  const protein = Number(
-    nutriments.proteins_100g ||
-      nutriments.protein_100g ||
-      0
-  );
+  const protein = Number(nutriments.proteins_100g || nutriments.protein_100g || 0);
 
   if (energyKcal > 500) {
     nutritionScore -= 8;
@@ -651,10 +612,7 @@ function calculateFoodScore(product) {
   details.additives = additivesScore;
 
   let organicScore = 0;
-  const labelsText = [
-    ...(product.labels_tags || []),
-    product.labels || ""
-  ]
+  const labelsText = [...(product.labels_tags || []), product.labels || ""]
     .join(" ")
     .toLowerCase();
 
@@ -667,9 +625,7 @@ function calculateFoodScore(product) {
 
   let total = details.nutrition + details.additives + details.organic;
 
-  if (hasHighRiskAdditive) {
-    total = Math.min(total, 49);
-  }
+  if (hasHighRiskAdditive) total = Math.min(total, 49);
 
   total = Math.max(0, Math.min(100, total));
 
@@ -677,10 +633,7 @@ function calculateFoodScore(product) {
     details.positives.push("No major concerns detected from available data");
   }
 
-  return {
-    score: Math.round(total),
-    details
-  };
+  return { score: Math.round(total), details };
 }
 
 function calculateCosmeticScore(product) {
@@ -692,95 +645,78 @@ function calculateCosmeticScore(product) {
   let score = 100;
   const ingredientText = getIngredientText(product);
 
-  const highRiskTerms = [
-    "paraben",
-    "phthalate",
-    "triclosan",
-    "formaldehyde",
-    "bht"
-  ];
+  const highRiskTerms = ["paraben", "phthalate", "triclosan", "formaldehyde", "bht"];
+  const moderateRiskTerms = ["parfum", "fragrance", "methylisothiazolinone", "phenoxyethanol"];
 
-  const moderateRiskTerms = [
-    "parfum",
-    "fragrance",
-    "methylisothiazolinone"
-  ];
-
-  const hasHighRisk = highRiskTerms.some((term) =>
-    ingredientText.includes(term)
-  );
-
-  const hasModerateRisk = moderateRiskTerms.some((term) =>
-    ingredientText.includes(term)
-  );
+  const hasHighRisk = highRiskTerms.some((term) => ingredientText.includes(term));
+  const hasModerateRisk = moderateRiskTerms.some((term) => ingredientText.includes(term));
 
   if (hasHighRisk) {
     score = Math.min(score, 24);
-    details.warnings.push(
-      "Contains high-risk cosmetic ingredients in this prototype model"
-    );
+    details.warnings.push("Contains high-risk cosmetic ingredients in this prototype model");
   } else if (hasModerateRisk) {
     score = Math.min(score, 49);
-    details.warnings.push(
-      "Contains moderate-risk cosmetic ingredients or fragrance concerns"
-    );
+    details.warnings.push("Contains moderate-risk cosmetic ingredients or fragrance concerns");
   } else {
-    details.positives.push(
-      "No high-risk cosmetic ingredients detected from available data"
-    );
+    details.positives.push("No high-risk cosmetic ingredients detected from available data");
   }
 
-  score = Math.max(0, Math.min(100, score));
+  return { score: Math.max(0, Math.min(100, Math.round(score))), details };
+}
+
+function scoreProduct(product) {
+  const kind = getProductKind(product);
+  const scoring = kind === "cosmetic" ? calculateCosmeticScore(product) : calculateFoodScore(product);
 
   return {
-    score: Math.round(score),
-    details
+    ...product,
+    productKind: kind,
+    score: scoring.score,
+    details: scoring.details
   };
 }
 
 function getScoreInfo(score) {
   if (score >= 80) {
-    return {
-      label: "Excellent",
-      color: "#10b981",
-      bg: "bg-emerald-50",
-      border: "border-emerald-300"
-    };
+    return { label: "Excellent", color: "#10b981", bg: "bg-emerald-50", border: "border-emerald-300" };
   }
 
   if (score >= 60) {
-    return {
-      label: "Good",
-      color: "#84cc16",
-      bg: "bg-lime-50",
-      border: "border-lime-300"
-    };
+    return { label: "Good", color: "#84cc16", bg: "bg-lime-50", border: "border-lime-300" };
   }
 
   if (score >= 40) {
-    return {
-      label: "Average",
-      color: "#f59e0b",
-      bg: "bg-amber-50",
-      border: "border-amber-300"
-    };
+    return { label: "Average", color: "#f59e0b", bg: "bg-amber-50", border: "border-amber-300" };
   }
 
   if (score >= 20) {
-    return {
-      label: "Poor",
-      color: "#ef4444",
-      bg: "bg-red-50",
-      border: "border-red-300"
-    };
+    return { label: "Poor", color: "#ef4444", bg: "bg-red-50", border: "border-red-300" };
   }
 
-  return {
-    label: "Very Poor",
-    color: "#7c2d12",
-    bg: "bg-red-100",
-    border: "border-red-400"
-  };
+  return { label: "Very Poor", color: "#7c2d12", bg: "bg-red-100", border: "border-red-400" };
+}
+
+function getRecommendations(currentProduct, limit = 4) {
+  if (!currentProduct) return [];
+
+  const demoScoredProducts = DEMO_PRODUCTS.map((item) =>
+    scoreProduct(normaliseFallbackProduct(item))
+  );
+
+  const sameKind = demoScoredProducts
+    .filter((product) => product.barcode !== currentProduct.barcode)
+    .filter((product) => product.productKind === currentProduct.productKind)
+    .filter((product) => product.score > currentProduct.score)
+    .sort((a, b) => b.score - a.score);
+
+  const anyBetter = demoScoredProducts
+    .filter((product) => product.barcode !== currentProduct.barcode)
+    .filter((product) => product.score > currentProduct.score)
+    .sort((a, b) => b.score - a.score);
+
+  return [...sameKind, ...anyBetter]
+    .filter((product, index, array) => array.findIndex((item) => item.barcode === product.barcode) === index)
+    .slice(0, limit);
 }
 
 export default function App() {
@@ -810,21 +746,13 @@ export default function App() {
 
     userPreferences.allergens.forEach((allergen) => {
       if (ingredientText.includes(allergen.toLowerCase())) {
-        alerts.push({
-          type: "allergen",
-          message: `Contains ${allergen}`,
-          severity: "high"
-        });
+        alerts.push({ type: "allergen", message: `Contains ${allergen}`, severity: "high" });
       }
     });
 
     userPreferences.avoidIngredients.forEach((ingredient) => {
       if (ingredientText.includes(ingredient.toLowerCase())) {
-        alerts.push({
-          type: "ingredient",
-          message: `Contains ${ingredient}`,
-          severity: "medium"
-        });
+        alerts.push({ type: "ingredient", message: `Contains ${ingredient}`, severity: "medium" });
       }
     });
 
@@ -832,32 +760,13 @@ export default function App() {
   }
 
   async function openProduct(product, barcode) {
-    const categoryText = [
-      product.product_type || "",
-      product.categories || "",
-      ...(product.categories_tags || [])
-    ]
-      .join(" ")
-      .toLowerCase();
-
-    const isCosmetic =
-      categoryText.includes("beauty") ||
-      categoryText.includes("cosmetic") ||
-      categoryText.includes("personal care");
-
-    const scoring = isCosmetic
-      ? calculateCosmeticScore(product)
-      : calculateFoodScore(product);
-
+    const scored = scoreProduct(product);
     const userAlerts = checkUserAlerts(product);
 
     const productWithScore = {
-      ...product,
+      ...scored,
       barcode,
-      score: scoring.score,
-      details: scoring.details,
       userAlerts,
-      productKind: isCosmetic ? "cosmetic" : "food",
       scannedAt: new Date().toLocaleDateString()
     };
 
@@ -888,9 +797,7 @@ export default function App() {
         `https://world.openfoodfacts.org/api/v0/product/${cleanBarcode}.json`
       );
 
-      if (!response.ok) {
-        throw new Error("Product not found");
-      }
+      if (!response.ok) throw new Error("Product not found");
 
       const data = await response.json();
 
@@ -913,9 +820,7 @@ export default function App() {
   }
 
   useEffect(() => {
-    if (screen !== "scanner") {
-      return undefined;
-    }
+    if (screen !== "scanner") return undefined;
 
     let controls;
     let cancelled = false;
@@ -928,9 +833,7 @@ export default function App() {
 
       try {
         if (!navigator.mediaDevices?.getUserMedia) {
-          setError(
-            "Camera is not available in this browser. Use manual barcode entry."
-          );
+          setError("Camera is not available in this browser. Use manual barcode entry.");
           setScannerStatus("Manual entry only");
           return;
         }
@@ -948,12 +851,8 @@ export default function App() {
         try {
           const devices = await BrowserMultiFormatReader.listVideoInputDevices();
           const backCamera =
-            devices.find((device) =>
-              String(device.label || "").toLowerCase().includes("back")
-            ) ||
-            devices.find((device) =>
-              String(device.label || "").toLowerCase().includes("rear")
-            ) ||
+            devices.find((device) => String(device.label || "").toLowerCase().includes("back")) ||
+            devices.find((device) => String(device.label || "").toLowerCase().includes("rear")) ||
             devices[devices.length - 1];
 
           selectedDeviceId = backCamera?.deviceId;
@@ -967,9 +866,7 @@ export default function App() {
           selectedDeviceId,
           videoRef.current,
           (result, scanError, scannerControls) => {
-            if (cancelled || scanLockRef.current) {
-              return;
-            }
+            if (cancelled || scanLockRef.current) return;
 
             if (result) {
               const barcode = result.getText();
@@ -978,9 +875,7 @@ export default function App() {
                 scanLockRef.current = true;
                 setScannerStatus(`Barcode found: ${barcode}`);
 
-                if (scannerControls) {
-                  scannerControls.stop();
-                }
+                if (scannerControls) scannerControls.stop();
 
                 fetchProduct(barcode);
               }
@@ -988,9 +883,7 @@ export default function App() {
           }
         );
 
-        if (!cancelled) {
-          setCameraActive(true);
-        }
+        if (!cancelled) setCameraActive(true);
       } catch {
         setError("Scanner could not start. Use manual barcode entry instead.");
         setScannerStatus("Manual entry only");
@@ -1003,9 +896,7 @@ export default function App() {
       cancelled = true;
       scanLockRef.current = false;
 
-      if (controls) {
-        controls.stop();
-      }
+      if (controls) controls.stop();
 
       if (videoRef.current?.srcObject) {
         videoRef.current.srcObject.getTracks().forEach((track) => track.stop());
@@ -1016,9 +907,7 @@ export default function App() {
   }, [screen, scannerRestartKey]);
 
   function toggleFavorite(product) {
-    const isAlreadySaved = favorites.some(
-      (item) => item.barcode === product.barcode
-    );
+    const isAlreadySaved = favorites.some((item) => item.barcode === product.barcode);
 
     if (isAlreadySaved) {
       setFavorites(favorites.filter((item) => item.barcode !== product.barcode));
@@ -1029,14 +918,8 @@ export default function App() {
 
   function addToComparison(product) {
     setComparisonProducts((previousProducts) => {
-      const alreadyAdded = previousProducts.some(
-        (item) => item.barcode === product.barcode
-      );
-
-      if (alreadyAdded) {
-        return previousProducts;
-      }
-
+      const alreadyAdded = previousProducts.some((item) => item.barcode === product.barcode);
+      if (alreadyAdded) return previousProducts;
       return [...previousProducts, product].slice(0, 3);
     });
   }
@@ -1059,6 +942,8 @@ export default function App() {
     currentProduct &&
     favorites.some((item) => item.barcode === currentProduct.barcode);
 
+  const recommendations = getRecommendations(currentProduct, 4);
+
   if (screen === "home") {
     return (
       <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-white to-teal-50">
@@ -1071,7 +956,30 @@ export default function App() {
             </div>
 
             <h1 className="mb-1 text-4xl font-bold text-gray-900">Pinch</h1>
-            <p className="text-lg text-gray-600">Understand what you’re buying</p>
+            <p className="text-lg text-gray-600">Scan. Understand. Choose better.</p>
+          </div>
+
+          <div className="mb-6 grid grid-cols-2 gap-3">
+            <FeatureCard
+              icon={<Camera className="h-5 w-5" />}
+              title="Scan labels"
+              text="Scan food, hygiene, and cosmetic products."
+            />
+            <FeatureCard
+              icon={<Info className="h-5 w-5" />}
+              title="Food analysis"
+              text="Detailed data sheets explain food scores."
+            />
+            <FeatureCard
+              icon={<ShieldCheck className="h-5 w-5" />}
+              title="Cosmetic analysis"
+              text="Understand ingredient risks in personal care."
+            />
+            <FeatureCard
+              icon={<Sparkles className="h-5 w-5" />}
+              title="Recommendations"
+              text="Find healthier similar alternatives."
+            />
           </div>
 
           <div className="mb-8 space-y-3">
@@ -1081,7 +989,7 @@ export default function App() {
                 setSearchBarcode("");
                 setScreen("scanner");
               }}
-              className="flex w-full transform items-center justify-center gap-3 rounded-xl bg-emerald-600 py-4 text-lg font-bold text-white shadow-lg transition hover:scale-105 hover:bg-emerald-700"
+              className="flex w-full items-center justify-center gap-3 rounded-xl bg-emerald-600 py-4 text-lg font-bold text-white shadow-lg"
             >
               <Camera className="h-6 w-6" />
               Scan Barcode
@@ -1093,27 +1001,35 @@ export default function App() {
                 setSearchBarcode("");
                 setScreen("search");
               }}
-              className="flex w-full items-center justify-center gap-3 rounded-xl border-2 border-emerald-600 bg-white py-4 text-lg font-bold text-emerald-600 hover:bg-emerald-50"
+              className="flex w-full items-center justify-center gap-3 rounded-xl border-2 border-emerald-600 bg-white py-4 text-lg font-bold text-emerald-600"
             >
               <Search className="h-6 w-6" />
               Manual Search
             </button>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-3 gap-3">
               <button
-                onClick={() => setScreen("settings")}
-                className="flex flex-col items-center gap-2 rounded-xl border-2 border-blue-300 bg-white py-3 font-semibold text-blue-600"
+                onClick={() => setScreen("history")}
+                className="rounded-xl bg-white p-3 text-center font-bold text-gray-700 shadow"
               >
-                <Bell className="h-5 w-5" />
-                Alerts
+                <History className="mx-auto mb-1 h-5 w-5" />
+                History
               </button>
 
               <button
-                onClick={() => setScreen("comparison")}
-                className="flex flex-col items-center gap-2 rounded-xl border-2 border-purple-300 bg-white py-3 font-semibold text-purple-600"
+                onClick={() => setScreen("recommendations")}
+                className="rounded-xl bg-white p-3 text-center font-bold text-gray-700 shadow"
               >
-                <Scale className="h-5 w-5" />
-                Compare
+                <Leaf className="mx-auto mb-1 h-5 w-5" />
+                Recs
+              </button>
+
+              <button
+                onClick={() => setScreen("settings")}
+                className="rounded-xl bg-white p-3 text-center font-bold text-gray-700 shadow"
+              >
+                <Bell className="mx-auto mb-1 h-5 w-5" />
+                Alerts
               </button>
             </div>
           </div>
@@ -1125,81 +1041,19 @@ export default function App() {
               </h2>
 
               <div className="space-y-3">
-                {products.slice(0, 3).map((product) => {
-                  const scoreInfo = getScoreInfo(product.score);
-
-                  return (
-                    <button
-                      key={product.barcode}
-                      onClick={() => {
-                        setCurrentProduct(product);
-                        setScreen("result");
-                      }}
-                      className="flex w-full items-center gap-3 rounded-xl bg-white p-4 shadow"
-                    >
-                      {product.image_url ? (
-                        <img
-                          src={product.image_url}
-                          alt={getProductName(product)}
-                          className="h-14 w-14 rounded object-contain bg-white"
-                        />
-                      ) : (
-                        <div className="flex h-14 w-14 items-center justify-center rounded bg-emerald-100 text-2xl">
-                          {getProductEmoji(product)}
-                        </div>
-                      )}
-
-                      <div className="flex-1 text-left">
-                        <p className="line-clamp-1 font-semibold text-gray-900">
-                          {getProductName(product)}
-                        </p>
-                        <p className="text-sm text-gray-500">
-                          {getProductBrand(product)}
-                        </p>
-                      </div>
-
-                      <div
-                        className="flex h-12 w-12 items-center justify-center rounded-full text-sm font-bold text-white shadow"
-                        style={{ backgroundColor: scoreInfo.color }}
-                      >
-                        {product.score}
-                      </div>
-                    </button>
-                  );
-                })}
+                {products.slice(0, 3).map((product) => (
+                  <ProductRow
+                    key={product.barcode}
+                    product={product}
+                    onClick={() => {
+                      setCurrentProduct(product);
+                      setScreen("result");
+                    }}
+                  />
+                ))}
               </div>
             </div>
           )}
-
-          <div className="grid grid-cols-3 gap-2">
-            <button
-              onClick={() => setScreen("history")}
-              className="rounded-xl bg-white p-4 text-center shadow"
-            >
-              <p className="mb-1 text-2xl">📋</p>
-              <p className="text-xs font-bold text-gray-700">
-                {products.length} Scans
-              </p>
-            </button>
-
-            <button
-              onClick={() => setScreen("favorites")}
-              className="rounded-xl bg-white p-4 text-center shadow"
-            >
-              <p className="mb-1 text-2xl">❤️</p>
-              <p className="text-xs font-bold text-gray-700">
-                {favorites.length} Fav
-              </p>
-            </button>
-
-            <button
-              onClick={() => setScreen("settings")}
-              className="rounded-xl bg-white p-4 text-center shadow"
-            >
-              <p className="mb-1 text-2xl">⚙️</p>
-              <p className="text-xs font-bold text-gray-700">Settings</p>
-            </button>
-          </div>
 
           <p className="mt-8 rounded-xl bg-white p-4 text-center text-xs leading-5 text-gray-500 shadow-sm">
             Pinch provides product information only. Always check labels yourself,
@@ -1269,26 +1123,7 @@ export default function App() {
             Restart Camera Scanner
           </button>
 
-          <div className="max-h-72 overflow-y-auto rounded-xl border border-gray-800 p-2">
-            <p className="mb-2 px-1 text-xs font-bold uppercase tracking-wide text-gray-400">
-              Demo product list
-            </p>
-
-            <div className="grid grid-cols-2 gap-2">
-              {DEMO_PRODUCTS.map((item) => (
-                <button
-                  key={item.barcode}
-                  onClick={() =>
-                    fetchProduct(item.barcode, normaliseFallbackProduct(item))
-                  }
-                  className="rounded-lg bg-gray-800 px-2 py-3 text-left text-xs font-semibold text-white"
-                >
-                  <span className="block text-sm">{item.name}</span>
-                  <span className="block text-gray-400">{item.category}</span>
-                </button>
-              ))}
-            </div>
-          </div>
+          <DemoProductGrid fetchProduct={fetchProduct} />
 
           {error && (
             <div className="rounded-lg bg-red-900/60 p-3 text-center text-sm font-semibold text-red-100">
@@ -1309,78 +1144,44 @@ export default function App() {
 
   if (screen === "search") {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-white to-blue-50">
-        <div className="mx-auto max-w-lg px-4 py-6">
+      <StandardScreen title="Search Product" onBack={() => setScreen("home")}>
+        <form
+          onSubmit={(event) => {
+            event.preventDefault();
+            fetchProduct(searchBarcode);
+          }}
+          className="mb-6"
+        >
+          <input
+            type="text"
+            inputMode="numeric"
+            enterKeyHint="search"
+            placeholder="Enter barcode..."
+            value={searchBarcode}
+            onChange={(event) => setSearchBarcode(event.target.value)}
+            className="mb-4 w-full rounded-xl border-2 border-emerald-300 px-4 py-3 text-lg focus:border-emerald-600 focus:outline-none"
+          />
+
           <button
-            onClick={() => setScreen("home")}
-            className="mb-6 flex items-center gap-2 font-semibold text-emerald-600"
+            type="submit"
+            disabled={loading || !searchBarcode.trim()}
+            className="w-full rounded-xl bg-emerald-600 py-3 font-bold text-white disabled:bg-gray-300 disabled:text-gray-500"
           >
-            <ArrowLeft className="h-5 w-5" />
-            Back
+            {loading ? "Searching..." : "Search Barcode"}
           </button>
+        </form>
 
-          <h1 className="mb-6 text-3xl font-bold text-gray-900">
-            Search Product
-          </h1>
-
-          <form
-            onSubmit={(event) => {
-              event.preventDefault();
-              fetchProduct(searchBarcode);
-            }}
-            className="mb-6"
-          >
-            <input
-              type="text"
-              inputMode="numeric"
-              enterKeyHint="search"
-              placeholder="Enter barcode..."
-              value={searchBarcode}
-              onChange={(event) => setSearchBarcode(event.target.value)}
-              className="mb-4 w-full rounded-xl border-2 border-emerald-300 px-4 py-3 text-lg focus:border-emerald-600 focus:outline-none"
-            />
-
-            <button
-              type="submit"
-              disabled={loading || !searchBarcode.trim()}
-              className="w-full rounded-xl bg-emerald-600 py-3 font-bold text-white disabled:bg-gray-300 disabled:text-gray-500"
-            >
-              {loading ? "Searching..." : "Search Barcode"}
-            </button>
-          </form>
-
-          <div className="mb-6 rounded-xl bg-white p-4 shadow">
-            <h2 className="mb-3 font-bold text-gray-900">
-              Try a demo product
-            </h2>
-
-            <div className="grid grid-cols-2 gap-2">
-              {DEMO_PRODUCTS.map((item) => (
-                <button
-                  key={item.barcode}
-                  onClick={() =>
-                    fetchProduct(item.barcode, normaliseFallbackProduct(item))
-                  }
-                  className="rounded-lg bg-emerald-50 px-3 py-3 text-left"
-                >
-                  <span className="block text-sm font-bold text-emerald-900">
-                    {item.name}
-                  </span>
-                  <span className="block text-xs text-emerald-700">
-                    {item.category}
-                  </span>
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {error && (
-            <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-red-700">
-              {error}
-            </div>
-          )}
+        <div className="mb-6 rounded-xl bg-white p-4 shadow">
+          <h2 className="mb-3 font-bold text-gray-900">Try a demo product</h2>
+          <DemoProductGrid fetchProduct={fetchProduct} light />
         </div>
-      </div>
+
+        {error && (
+          <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-red-700">
+            {error}
+          </div>
+        )}
+      </StandardScreen>
     );
   }
 
@@ -1388,384 +1189,248 @@ export default function App() {
     const scoreInfo = getScoreInfo(currentProduct.score);
 
     return (
-      <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-white to-blue-50 pb-28">
-        <div className="mx-auto max-w-lg px-4 py-6">
-          <button
-            onClick={() => setScreen("home")}
-            className="mb-6 flex items-center gap-2 font-semibold text-emerald-600"
+      <StandardScreen title="" onBack={() => setScreen("home")}>
+        {currentProduct.image_url ? (
+          <div className="mb-6 overflow-hidden rounded-2xl bg-white shadow-lg">
+            <img
+              src={currentProduct.image_url}
+              alt={getProductName(currentProduct)}
+              className="h-64 w-full object-contain"
+            />
+          </div>
+        ) : (
+          <div className="mb-6 flex h-40 items-center justify-center rounded-2xl bg-white text-6xl shadow-lg">
+            {getProductEmoji(currentProduct)}
+          </div>
+        )}
+
+        <div className="mb-6">
+          <p className="mb-1 text-sm text-gray-500">{getProductBrand(currentProduct)}</p>
+          <h1 className="text-2xl font-bold text-gray-900">
+            {getProductName(currentProduct)}
+          </h1>
+          <p className="mt-2 text-sm font-semibold capitalize text-gray-500">
+            {currentProduct.productKind} analysis
+          </p>
+        </div>
+
+        {currentProduct.userAlerts?.length > 0 && (
+          <div className="mb-6 rounded-xl border-2 border-red-300 bg-red-50 p-4">
+            <p className="mb-2 font-bold text-red-700">⚠️ Your Alerts</p>
+            {currentProduct.userAlerts.map((alert, index) => (
+              <p key={`${alert.message}-${index}`} className="text-sm text-red-700">
+                • {alert.message}
+              </p>
+            ))}
+          </div>
+        )}
+
+        <div
+          className={`mb-6 rounded-3xl border-4 ${scoreInfo.border} ${scoreInfo.bg} p-8 text-center shadow-lg`}
+        >
+          <p className="mb-2 font-semibold text-gray-600">Health Score</p>
+          <div
+            className="mx-auto mb-4 flex h-28 w-28 items-center justify-center rounded-full text-5xl font-bold text-white shadow-xl"
+            style={{ backgroundColor: scoreInfo.color }}
           >
-            <ArrowLeft className="h-5 w-5" />
-            Back
+            {currentProduct.score}
+          </div>
+          <p className="text-2xl font-bold" style={{ color: scoreInfo.color }}>
+            {scoreInfo.label}
+          </p>
+        </div>
+
+        <AnalysisSheet product={currentProduct} />
+
+        {currentProduct.score < 60 && recommendations.length > 0 && (
+          <div className="mb-6 rounded-xl bg-white p-4 shadow">
+            <div className="mb-3 flex items-center justify-between">
+              <div>
+                <h3 className="font-bold text-gray-900">Healthier alternatives</h3>
+                <p className="text-sm text-gray-500">
+                  Independent recommendations based on better scores.
+                </p>
+              </div>
+              <button
+                onClick={() => setScreen("recommendations")}
+                className="text-sm font-bold text-emerald-700"
+              >
+                View all
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              {recommendations.slice(0, 3).map((product) => (
+                <ProductRow
+                  key={product.barcode}
+                  product={product}
+                  onClick={() => {
+                    openProduct(product, product.barcode);
+                  }}
+                />
+              ))}
+            </div>
+          </div>
+        )}
+
+        <div className="grid grid-cols-3 gap-3 pb-6">
+          <button
+            onClick={() => toggleFavorite(currentProduct)}
+            className={`flex items-center justify-center gap-2 rounded-xl py-3 font-semibold ${
+              isFavorited
+                ? "border border-red-300 bg-red-100 text-red-700"
+                : "border border-gray-300 bg-white text-gray-700"
+            }`}
+          >
+            <Heart className={`h-5 w-5 ${isFavorited ? "fill-current" : ""}`} />
+            Save
           </button>
 
-          {currentProduct.image_url ? (
-            <div className="mb-6 overflow-hidden rounded-2xl bg-white shadow-lg">
-              <img
-                src={currentProduct.image_url}
-                alt={getProductName(currentProduct)}
-                className="h-64 w-full object-contain"
-              />
-            </div>
-          ) : (
-            <div className="mb-6 flex h-40 items-center justify-center rounded-2xl bg-white text-6xl shadow-lg">
-              {getProductEmoji(currentProduct)}
-            </div>
-          )}
-
-          <div className="mb-6">
-            <p className="mb-1 text-sm text-gray-500">
-              {getProductBrand(currentProduct)}
-            </p>
-            <h1 className="text-2xl font-bold text-gray-900">
-              {getProductName(currentProduct)}
-            </h1>
-            {currentProduct.source === "Demo fallback" && (
-              <p className="mt-2 rounded-full bg-blue-50 px-3 py-1 text-xs font-bold text-blue-700">
-                Demo fallback product
-              </p>
-            )}
-          </div>
-
-          {currentProduct.userAlerts?.length > 0 && (
-            <div className="mb-6 rounded-xl border-2 border-red-300 bg-red-50 p-4">
-              <p className="mb-2 font-bold text-red-700">⚠️ Your Alerts</p>
-              {currentProduct.userAlerts.map((alert, index) => (
-                <p
-                  key={`${alert.message}-${index}`}
-                  className="text-sm text-red-700"
-                >
-                  • {alert.message}
-                </p>
-              ))}
-            </div>
-          )}
-
-          <div
-            className={`mb-6 rounded-3xl border-4 ${scoreInfo.border} ${scoreInfo.bg} p-8 text-center shadow-lg`}
+          <button
+            onClick={() => {
+              addToComparison(currentProduct);
+              setScreen("comparison");
+            }}
+            className="rounded-xl bg-purple-600 py-3 font-bold text-white"
           >
-            <p className="mb-2 font-semibold text-gray-600">Health Score</p>
+            Compare
+          </button>
 
-            <div
-              className="mx-auto mb-4 flex h-28 w-28 items-center justify-center rounded-full text-5xl font-bold text-white shadow-xl"
-              style={{ backgroundColor: scoreInfo.color }}
-            >
-              {currentProduct.score}
-            </div>
-
-            <p className="text-2xl font-bold" style={{ color: scoreInfo.color }}>
-              {scoreInfo.label}
-            </p>
-          </div>
-
-          <div className="mb-4 rounded-xl bg-white p-4 shadow">
-            <h3 className="mb-2 font-bold text-gray-900">Why this score?</h3>
-            <p className="text-sm leading-6 text-gray-700">
-              Pinch calculates this using nutrition quality, additive risk, and
-              organic or quality labels where available. The score is based only
-              on available product data.
-            </p>
-
-            {currentProduct.productKind === "food" && (
-              <div className="mt-4 grid grid-cols-3 gap-2 text-center text-sm">
-                <div className="rounded-lg bg-emerald-50 p-3">
-                  <p className="text-xs text-gray-500">Nutrition</p>
-                  <p className="font-bold text-emerald-700">
-                    {currentProduct.details.nutrition}/60
-                  </p>
-                </div>
-
-                <div className="rounded-lg bg-amber-50 p-3">
-                  <p className="text-xs text-gray-500">Additives</p>
-                  <p className="font-bold text-amber-700">
-                    {currentProduct.details.additives}/30
-                  </p>
-                </div>
-
-                <div className="rounded-lg bg-blue-50 p-3">
-                  <p className="text-xs text-gray-500">Organic</p>
-                  <p className="font-bold text-blue-700">
-                    {currentProduct.details.organic}/10
-                  </p>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {currentProduct.details?.warnings?.length > 0 && (
-            <div className="mb-4 rounded-xl border border-amber-300 bg-amber-50 p-4">
-              <h3 className="mb-2 font-bold text-amber-900">⚠️ Concerns</h3>
-              {currentProduct.details.warnings.map((warning, index) => (
-                <p
-                  key={`${warning}-${index}`}
-                  className="text-sm text-amber-800"
-                >
-                  • {warning}
-                </p>
-              ))}
-            </div>
-          )}
-
-          {currentProduct.details?.positives?.length > 0 && (
-            <div className="mb-4 rounded-xl border border-green-300 bg-green-50 p-4">
-              <h3 className="mb-2 font-bold text-green-900">✓ Positives</h3>
-              {currentProduct.details.positives.map((positive, index) => (
-                <p
-                  key={`${positive}-${index}`}
-                  className="text-sm text-green-800"
-                >
-                  • {positive}
-                </p>
-              ))}
-            </div>
-          )}
-
-          <div className="fixed bottom-4 left-4 right-4 mx-auto max-w-lg space-y-3">
-            <div className="grid grid-cols-3 gap-3">
-              <button
-                onClick={() => toggleFavorite(currentProduct)}
-                className={`flex items-center justify-center gap-2 rounded-xl py-3 font-semibold ${
-                  isFavorited
-                    ? "border border-red-300 bg-red-100 text-red-700"
-                    : "border border-gray-300 bg-white text-gray-700"
-                }`}
-              >
-                <Heart
-                  className={`h-5 w-5 ${isFavorited ? "fill-current" : ""}`}
-                />
-                {isFavorited ? "Saved" : "Save"}
-              </button>
-
-              <button
-                onClick={() => {
-                  addToComparison(currentProduct);
-                  setScreen("comparison");
-                }}
-                className="rounded-xl bg-purple-600 py-3 font-bold text-white"
-              >
-                Compare
-              </button>
-
-              <button
-                onClick={() => setScreen("details")}
-                className="rounded-xl bg-emerald-600 py-3 font-bold text-white"
-              >
-                Details
-              </button>
-            </div>
-          </div>
+          <button
+            onClick={() => setScreen("details")}
+            className="rounded-xl bg-emerald-600 py-3 font-bold text-white"
+          >
+            Details
+          </button>
         </div>
-      </div>
+      </StandardScreen>
     );
   }
 
   if (screen === "details" && currentProduct) {
-    const nutriments = currentProduct.nutriments || {};
-    const additiveTags = currentProduct.additives_tags || [];
+    return (
+      <StandardScreen title="Detailed data sheet" onBack={() => setScreen("result")}>
+        <AnalysisSheet product={currentProduct} expanded />
+
+        <div className="mt-6 rounded-xl border border-blue-200 bg-blue-50 p-4">
+          <p className="text-xs leading-5 text-blue-700">
+            <strong>Disclaimer:</strong> Pinch provides product information based
+            on available label data and prototype scoring rules. It is not medical
+            advice and does not replace a doctor, dietitian, pharmacist, or the
+            official product label.
+          </p>
+        </div>
+      </StandardScreen>
+    );
+  }
+
+  if (screen === "recommendations") {
+    const recommendedProducts = currentProduct
+      ? getRecommendations(currentProduct, 12)
+      : DEMO_PRODUCTS.map((item) => scoreProduct(normaliseFallbackProduct(item)))
+          .sort((a, b) => b.score - a.score)
+          .slice(0, 10);
 
     return (
-      <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-white to-blue-50">
-        <div className="mx-auto max-w-lg px-4 py-6">
-          <button
-            onClick={() => setScreen("result")}
-            className="mb-6 flex items-center gap-2 font-semibold text-emerald-600"
-          >
-            <ArrowLeft className="h-5 w-5" />
-            Back
-          </button>
-
-          <h1 className="mb-6 text-2xl font-bold text-gray-900">
-            Full Details
-          </h1>
-
-          <div className="mb-4 rounded-xl bg-white p-5 shadow">
-            <h3 className="mb-4 font-bold text-gray-900">Nutrition per 100g</h3>
-
-            <div className="grid grid-cols-2 gap-4">
-              <DetailMetric
-                label="Energy"
-                value={`${Math.round(getEnergyKcal(currentProduct)) || 0} kcal`}
-                tone="orange"
-              />
-              <DetailMetric
-                label="Sugar"
-                value={`${Number(nutriments.sugars_100g || 0).toFixed(1)}g`}
-                tone="red"
-              />
-              <DetailMetric
-                label="Saturated Fat"
-                value={`${Number(
-                  nutriments["saturated-fat_100g"] ||
-                    nutriments.saturated_fat_100g ||
-                    0
-                ).toFixed(1)}g`}
-                tone="amber"
-              />
-              <DetailMetric
-                label="Salt"
-                value={`${getSalt(currentProduct).toFixed(2)}g`}
-                tone="blue"
-              />
-              <DetailMetric
-                label="Fibre"
-                value={`${Number(
-                  nutriments.fiber_100g ||
-                    nutriments.fibre_100g ||
-                    0
-                ).toFixed(1)}g`}
-                tone="green"
-              />
-              <DetailMetric
-                label="Protein"
-                value={`${Number(
-                  nutriments.proteins_100g ||
-                    nutriments.protein_100g ||
-                    0
-                ).toFixed(1)}g`}
-                tone="emerald"
-              />
-            </div>
-          </div>
-
-          <div className="mb-4 rounded-xl bg-white p-5 shadow">
-            <h3 className="mb-3 font-bold text-gray-900">Additives</h3>
-
-            {additiveTags.length > 0 ? (
-              <div className="space-y-2">
-                {additiveTags.map((tag) => {
-                  const key = normaliseAdditiveTag(tag);
-                  const additive = ADDITIVE_DATABASE[key];
-
-                  return (
-                    <div key={tag} className="rounded-lg bg-amber-50 p-3 text-sm">
-                      <p className="font-bold text-amber-900">
-                        {key.toUpperCase()} {additive ? `· ${additive.name}` : ""}
-                      </p>
-                      <p className="text-amber-800">
-                        Risk:{" "}
-                        {additive?.risk ||
-                          "not classified in prototype database"}
-                      </p>
-                    </div>
-                  );
-                })}
-              </div>
-            ) : (
-              <p className="text-sm text-gray-600">
-                No additives listed in available data.
-              </p>
-            )}
-          </div>
-
-          <div className="mb-4 rounded-xl bg-white p-5 shadow">
-            <h3 className="mb-3 font-bold text-gray-900">Ingredients</h3>
-            <p className="text-sm leading-6 text-gray-700">
-              {currentProduct.ingredients_text ||
-                currentProduct.ingredients_text_en ||
-                "No ingredient list available."}
-            </p>
-          </div>
-
-          <div className="mt-6 rounded-xl border border-blue-200 bg-blue-50 p-4">
-            <p className="text-xs leading-5 text-blue-700">
-              <strong>Disclaimer:</strong> Pinch provides product information
-              based on available label data and prototype scoring rules. It is
-              not medical advice and does not replace a doctor, dietitian,
-              pharmacist, or the official product label.
-            </p>
-          </div>
+      <StandardScreen title="Recommendations" onBack={() => setScreen("home")}>
+        <div className="mb-4 rounded-xl bg-white p-4 shadow">
+          <h2 className="mb-1 font-bold text-gray-900">
+            Get recommendations for healthier alternatives
+          </h2>
+          <p className="text-sm leading-6 text-gray-600">
+            When a scanned product scores poorly, Pinch suggests similar or better
+            products with stronger health scores. Recommendations are independent,
+            not paid placements.
+          </p>
         </div>
-      </div>
+
+        <div className="space-y-3">
+          {recommendedProducts.map((product) => (
+            <ProductRow
+              key={product.barcode}
+              product={product}
+              onClick={() => openProduct(product, product.barcode)}
+            />
+          ))}
+        </div>
+      </StandardScreen>
     );
   }
 
   if (screen === "settings") {
-    const allergens = [
-      "gluten",
-      "peanuts",
-      "milk",
-      "eggs",
-      "fish",
-      "soy",
-      "tree nuts"
-    ];
-
+    const allergens = ["gluten", "peanuts", "milk", "eggs", "fish", "soy", "tree nuts"];
     const dietary = ["vegetarian", "vegan", "kosher", "halal"];
-
-    const avoidIngredients = [
-      "palm oil",
-      "artificial sweeteners",
-      "GMO",
-      "parfum",
-      "BHT"
-    ];
+    const avoidIngredients = ["palm oil", "artificial sweeteners", "GMO", "parfum", "BHT"];
 
     return (
-      <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-white to-blue-50">
-        <div className="mx-auto max-w-lg px-4 py-6">
-          <button
-            onClick={() => setScreen("home")}
-            className="mb-6 flex items-center gap-2 font-semibold text-emerald-600"
-          >
-            <ArrowLeft className="h-5 w-5" />
-            Back
-          </button>
-
-          <h1 className="mb-6 text-3xl font-bold text-gray-900">
-            Settings & Alerts
-          </h1>
-
-          <div className="mb-6 rounded-2xl bg-gradient-to-br from-amber-400 to-orange-400 p-6 text-white shadow-lg">
-            <div className="flex items-start justify-between">
-              <div>
-                <h3 className="mb-2 text-xl font-bold">Go Premium</h3>
-                <p className="text-sm">
-                  Offline mode · Export data · Family profiles
-                </p>
-              </div>
-              <Lock className="h-8 w-8" />
+      <StandardScreen title="Settings & Alerts" onBack={() => setScreen("home")}>
+        <div className="mb-6 rounded-2xl bg-gradient-to-br from-amber-400 to-orange-400 p-6 text-white shadow-lg">
+          <div className="flex items-start justify-between">
+            <div>
+              <h3 className="mb-2 text-xl font-bold">Go Premium</h3>
+              <p className="text-sm">Offline mode · Export data · Family profiles</p>
             </div>
+            <Lock className="h-8 w-8" />
           </div>
-
-          <PreferenceCard
-            title="Your Allergens"
-            values={allergens}
-            activeValues={userPreferences.allergens}
-            onToggle={(value) => togglePreference("allergens", value)}
-            activeClass="bg-red-100 text-red-700 border-red-300"
-          />
-
-          <PreferenceCard
-            title="Dietary Preferences"
-            values={dietary}
-            activeValues={userPreferences.dietary}
-            onToggle={(value) => togglePreference("dietary", value)}
-            activeClass="bg-green-100 text-green-700 border-green-300"
-          />
-
-          <PreferenceCard
-            title="Ingredients to Avoid"
-            values={avoidIngredients}
-            activeValues={userPreferences.avoidIngredients}
-            onToggle={(value) => togglePreference("avoidIngredients", value)}
-            activeClass="bg-amber-100 text-amber-700 border-amber-300"
-          />
         </div>
-      </div>
+
+        <PreferenceCard
+          title="Your Allergens"
+          values={allergens}
+          activeValues={userPreferences.allergens}
+          onToggle={(value) => togglePreference("allergens", value)}
+          activeClass="bg-red-100 text-red-700 border-red-300"
+        />
+
+        <PreferenceCard
+          title="Dietary Preferences"
+          values={dietary}
+          activeValues={userPreferences.dietary}
+          onToggle={(value) => togglePreference("dietary", value)}
+          activeClass="bg-green-100 text-green-700 border-green-300"
+        />
+
+        <PreferenceCard
+          title="Ingredients to Avoid"
+          values={avoidIngredients}
+          activeValues={userPreferences.avoidIngredients}
+          onToggle={(value) => togglePreference("avoidIngredients", value)}
+          activeClass="bg-amber-100 text-amber-700 border-amber-300"
+        />
+      </StandardScreen>
     );
   }
 
   if (screen === "history") {
     return (
-      <ProductListScreen
-        title="Scan History"
-        emptyText="No scans yet"
-        products={products}
-        onBack={() => setScreen("home")}
-        onSelect={(product) => {
-          setCurrentProduct(product);
-          setScreen("result");
-        }}
-      />
+      <StandardScreen title="History" onBack={() => setScreen("home")}>
+        <div className="mb-4 rounded-xl bg-white p-4 shadow">
+          <h2 className="mb-1 font-bold text-gray-900">Your scanned products</h2>
+          <p className="text-sm leading-6 text-gray-600">
+            Pinch displays the products you have already scanned. The colour code
+            helps you quickly understand the product’s impact.
+          </p>
+        </div>
+
+        {products.length === 0 ? (
+          <div className="rounded-xl bg-white py-12 text-center shadow">
+            <p className="text-gray-500">No scans yet</p>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {products.map((product) => (
+              <ProductRow
+                key={product.barcode}
+                product={product}
+                onClick={() => {
+                  setCurrentProduct(product);
+                  setScreen("result");
+                }}
+              />
+            ))}
+          </div>
+        )}
+      </StandardScreen>
     );
   }
 
@@ -1786,114 +1451,275 @@ export default function App() {
 
   if (screen === "comparison") {
     const bestProduct = comparisonProducts.reduce((best, product) => {
-      if (!best) {
-        return product;
-      }
-
+      if (!best) return product;
       return product.score > best.score ? product : best;
     }, null);
 
     return (
-      <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-white to-blue-50">
-        <div className="mx-auto max-w-lg px-4 py-6">
-          <button
-            onClick={() => setScreen("home")}
-            className="mb-6 flex items-center gap-2 font-semibold text-emerald-600"
-          >
-            <ArrowLeft className="h-5 w-5" />
-            Back
-          </button>
+      <StandardScreen title="Compare Products" onBack={() => setScreen("home")}>
+        <p className="mb-6 text-gray-600">Add up to 3 products from the result screen.</p>
 
-          <h1 className="mb-2 text-3xl font-bold text-gray-900">
-            Compare Products
-          </h1>
-          <p className="mb-6 text-gray-600">
-            Add up to 3 products from the result screen.
-          </p>
+        {comparisonProducts.length === 0 ? (
+          <div className="rounded-xl bg-white py-12 text-center shadow">
+            <p className="text-gray-500">No products selected</p>
+            <button
+              onClick={() => setScreen("history")}
+              className="mt-4 rounded-lg bg-emerald-600 px-4 py-2 font-bold text-white"
+            >
+              Choose from history
+            </button>
+          </div>
+        ) : (
+          <>
+            {bestProduct && (
+              <div className="mb-4 rounded-xl border border-emerald-300 bg-emerald-50 p-4">
+                <p className="font-bold text-emerald-900">Best choice so far</p>
+                <p className="text-sm text-emerald-800">
+                  {getProductName(bestProduct)} has the highest score in this comparison.
+                </p>
+              </div>
+            )}
 
-          {comparisonProducts.length === 0 ? (
-            <div className="rounded-xl bg-white py-12 text-center shadow">
-              <p className="text-gray-500">No products selected</p>
-              <button
-                onClick={() => setScreen("history")}
-                className="mt-4 rounded-lg bg-emerald-600 px-4 py-2 font-bold text-white"
-              >
-                Choose from history
-              </button>
-            </div>
-          ) : (
-            <>
-              {bestProduct && (
-                <div className="mb-4 rounded-xl border border-emerald-300 bg-emerald-50 p-4">
-                  <p className="font-bold text-emerald-900">
-                    Best choice so far
-                  </p>
-                  <p className="text-sm text-emerald-800">
-                    {getProductName(bestProduct)} has the highest score in this
-                    comparison.
-                  </p>
-                </div>
-              )}
+            <div className="grid grid-cols-2 gap-3">
+              {comparisonProducts.map((product) => {
+                const scoreInfo = getScoreInfo(product.score);
 
-              <div className="grid grid-cols-2 gap-3">
-                {comparisonProducts.map((product) => {
-                  const scoreInfo = getScoreInfo(product.score);
-
-                  return (
-                    <div
-                      key={product.barcode}
-                      className="rounded-xl bg-white p-4 shadow"
-                    >
+                return (
+                  <div key={product.barcode} className="rounded-xl bg-white p-4 shadow">
+                    <div className="mb-3 flex h-24 w-full items-center justify-center rounded bg-emerald-50 text-3xl">
                       {product.image_url ? (
                         <img
                           src={product.image_url}
                           alt={getProductName(product)}
-                          className="mb-3 h-24 w-full rounded object-contain bg-white"
+                          className="h-full w-full object-contain"
                         />
                       ) : (
-                        <div className="mb-3 flex h-24 w-full items-center justify-center rounded bg-emerald-50 text-3xl">
-                          {getProductEmoji(product)}
-                        </div>
+                        getProductEmoji(product)
                       )}
-
-                      <p className="mb-2 text-xs text-gray-500">
-                        {getProductBrand(product)}
-                      </p>
-                      <p className="mb-3 line-clamp-2 text-sm font-semibold text-gray-900">
-                        {getProductName(product)}
-                      </p>
-
-                      <div
-                        className="flex h-12 w-full items-center justify-center rounded-lg text-2xl font-bold text-white"
-                        style={{ backgroundColor: scoreInfo.color }}
-                      >
-                        {product.score}
-                      </div>
-
-                      <button
-                        onClick={() =>
-                          setComparisonProducts((previous) =>
-                            previous.filter(
-                              (item) => item.barcode !== product.barcode
-                            )
-                          )
-                        }
-                        className="mt-3 w-full rounded-lg bg-gray-100 py-2 text-sm font-semibold text-gray-700"
-                      >
-                        Remove
-                      </button>
                     </div>
-                  );
-                })}
-              </div>
-            </>
-          )}
-        </div>
-      </div>
+
+                    <p className="mb-2 text-xs text-gray-500">{getProductBrand(product)}</p>
+                    <p className="mb-3 line-clamp-2 text-sm font-semibold text-gray-900">
+                      {getProductName(product)}
+                    </p>
+
+                    <div
+                      className="flex h-12 w-full items-center justify-center rounded-lg text-2xl font-bold text-white"
+                      style={{ backgroundColor: scoreInfo.color }}
+                    >
+                      {product.score}
+                    </div>
+
+                    <button
+                      onClick={() =>
+                        setComparisonProducts((previous) =>
+                          previous.filter((item) => item.barcode !== product.barcode)
+                        )
+                      }
+                      className="mt-3 w-full rounded-lg bg-gray-100 py-2 text-sm font-semibold text-gray-700"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          </>
+        )}
+      </StandardScreen>
     );
   }
 
   return null;
+}
+
+function FeatureCard({ icon, title, text }) {
+  return (
+    <div className="rounded-2xl bg-white p-4 shadow">
+      <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700">
+        {icon}
+      </div>
+      <h3 className="mb-1 text-sm font-bold text-gray-900">{title}</h3>
+      <p className="text-xs leading-5 text-gray-500">{text}</p>
+    </div>
+  );
+}
+
+function StandardScreen({ title, onBack, children }) {
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-white to-blue-50">
+      <div className="mx-auto max-w-lg px-4 py-6">
+        <button
+          onClick={onBack}
+          className="mb-6 flex items-center gap-2 font-semibold text-emerald-600"
+        >
+          <ArrowLeft className="h-5 w-5" />
+          Back
+        </button>
+
+        {title && <h1 className="mb-6 text-3xl font-bold text-gray-900">{title}</h1>}
+
+        {children}
+      </div>
+    </div>
+  );
+}
+
+function DemoProductGrid({ fetchProduct, light = false }) {
+  return (
+    <div className={`${light ? "" : "max-h-72 overflow-y-auto rounded-xl border border-gray-800 p-2"}`}>
+      {!light && (
+        <p className="mb-2 px-1 text-xs font-bold uppercase tracking-wide text-gray-400">
+          Demo product list
+        </p>
+      )}
+
+      <div className="grid grid-cols-2 gap-2">
+        {DEMO_PRODUCTS.map((item) => (
+          <button
+            key={item.barcode}
+            onClick={() => fetchProduct(item.barcode, normaliseFallbackProduct(item))}
+            className={`rounded-lg px-2 py-3 text-left text-xs font-semibold ${
+              light ? "bg-emerald-50 text-emerald-900" : "bg-gray-800 text-white"
+            }`}
+          >
+            <span className="block text-sm">{item.name}</span>
+            <span className={light ? "block text-emerald-700" : "block text-gray-400"}>
+              {item.category}
+            </span>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function AnalysisSheet({ product, expanded = false }) {
+  const isFood = product.productKind === "food";
+  const nutriments = product.nutriments || {};
+  const additiveTags = product.additives_tags || [];
+
+  return (
+    <div className="mb-6 rounded-xl bg-white p-4 shadow">
+      <h3 className="mb-2 font-bold text-gray-900">
+        {isFood ? "Food analysis" : "Cosmetic analysis"}
+      </h3>
+
+      <p className="mb-4 text-sm leading-6 text-gray-600">
+        {isFood
+          ? "Pinch analyzes food items and provides a detailed data sheet explaining how each product was evaluated."
+          : "Pinch analyzes hygiene and cosmetic products to help you understand ingredients, concerns, and the final score."}
+      </p>
+
+      {isFood ? (
+        <>
+          <div className="mb-4 grid grid-cols-3 gap-2 text-center text-sm">
+            <ScorePart label="Nutrition" value={`${product.details.nutrition}/60`} tone="emerald" />
+            <ScorePart label="Additives" value={`${product.details.additives}/30`} tone="amber" />
+            <ScorePart label="Organic" value={`${product.details.organic}/10`} tone="blue" />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <DetailMetric label="Energy" value={`${Math.round(getEnergyKcal(product)) || 0} kcal`} tone="orange" />
+            <DetailMetric label="Sugar" value={`${Number(nutriments.sugars_100g || 0).toFixed(1)}g`} tone="red" />
+            <DetailMetric
+              label="Saturated Fat"
+              value={`${Number(nutriments["saturated-fat_100g"] || nutriments.saturated_fat_100g || 0).toFixed(1)}g`}
+              tone="amber"
+            />
+            <DetailMetric label="Salt" value={`${getSalt(product).toFixed(2)}g`} tone="blue" />
+            <DetailMetric label="Fibre" value={`${Number(nutriments.fiber_100g || nutriments.fibre_100g || 0).toFixed(1)}g`} tone="green" />
+            <DetailMetric label="Protein" value={`${Number(nutriments.proteins_100g || nutriments.protein_100g || 0).toFixed(1)}g`} tone="emerald" />
+          </div>
+        </>
+      ) : (
+        <div className="space-y-3">
+          <div className="rounded-xl bg-amber-50 p-4">
+            <p className="text-sm font-bold text-amber-900">Ingredient safety model</p>
+            <p className="mt-1 text-sm leading-6 text-amber-800">
+              Cosmetic scoring is based on ingredient concerns such as fragrance,
+              allergens, irritants, preservatives, and prototype high-risk terms.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {expanded && (
+        <>
+          <div className="mt-4 rounded-xl bg-gray-50 p-4">
+            <h4 className="mb-2 font-bold text-gray-900">Ingredients</h4>
+            <p className="text-sm leading-6 text-gray-700">
+              {product.ingredients_text ||
+                product.ingredients_text_en ||
+                "No ingredient list available."}
+            </p>
+          </div>
+
+          <div className="mt-4 rounded-xl bg-gray-50 p-4">
+            <h4 className="mb-2 font-bold text-gray-900">Additives</h4>
+            {additiveTags.length > 0 ? (
+              <div className="space-y-2">
+                {additiveTags.map((tag) => {
+                  const key = normaliseAdditiveTag(tag);
+                  const additive = ADDITIVE_DATABASE[key];
+
+                  return (
+                    <div key={tag} className="rounded-lg bg-white p-3 text-sm">
+                      <p className="font-bold text-gray-900">
+                        {key.toUpperCase()} {additive ? `· ${additive.name}` : ""}
+                      </p>
+                      <p className="text-gray-600">
+                        Risk: {additive?.risk || "not classified in prototype database"}
+                      </p>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <p className="text-sm text-gray-600">No additives listed in available data.</p>
+            )}
+          </div>
+        </>
+      )}
+
+      {product.details?.warnings?.length > 0 && (
+        <div className="mt-4 rounded-xl border border-amber-300 bg-amber-50 p-4">
+          <h4 className="mb-2 font-bold text-amber-900">Concerns</h4>
+          {product.details.warnings.map((warning, index) => (
+            <p key={`${warning}-${index}`} className="text-sm text-amber-800">
+              • {warning}
+            </p>
+          ))}
+        </div>
+      )}
+
+      {product.details?.positives?.length > 0 && (
+        <div className="mt-4 rounded-xl border border-green-300 bg-green-50 p-4">
+          <h4 className="mb-2 font-bold text-green-900">Positives</h4>
+          {product.details.positives.map((positive, index) => (
+            <p key={`${positive}-${index}`} className="text-sm text-green-800">
+              • {positive}
+            </p>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ScorePart({ label, value, tone }) {
+  const toneMap = {
+    emerald: "bg-emerald-50 text-emerald-700",
+    amber: "bg-amber-50 text-amber-700",
+    blue: "bg-blue-50 text-blue-700"
+  };
+
+  return (
+    <div className={`rounded-lg p-3 ${toneMap[tone]}`}>
+      <p className="text-xs text-gray-500">{label}</p>
+      <p className="font-bold">{value}</p>
+    </div>
+  );
 }
 
 function DetailMetric({ label, value, tone }) {
@@ -1907,12 +1733,47 @@ function DetailMetric({ label, value, tone }) {
   };
 
   return (
-    <div
-      className={`rounded-lg p-3 ${toneMap[tone] || "bg-gray-50 text-gray-700"}`}
-    >
+    <div className={`rounded-lg p-3 ${toneMap[tone] || "bg-gray-50 text-gray-700"}`}>
       <p className="text-xs text-gray-600">{label}</p>
       <p className="font-bold">{value}</p>
     </div>
+  );
+}
+
+function ProductRow({ product, onClick }) {
+  const scoreInfo = getScoreInfo(product.score);
+
+  return (
+    <button
+      onClick={onClick}
+      className="flex w-full items-center gap-3 rounded-xl bg-white p-4 text-left shadow"
+    >
+      {product.image_url ? (
+        <img
+          src={product.image_url}
+          alt={getProductName(product)}
+          className="h-14 w-14 rounded object-contain bg-white"
+        />
+      ) : (
+        <div className="flex h-14 w-14 items-center justify-center rounded bg-emerald-50 text-2xl">
+          {getProductEmoji(product)}
+        </div>
+      )}
+
+      <div className="min-w-0 flex-1">
+        <p className="line-clamp-1 font-semibold text-gray-900">{getProductName(product)}</p>
+        <p className="text-xs text-gray-500">{getProductBrand(product)}</p>
+      </div>
+
+      <div
+        className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full text-sm font-bold text-white"
+        style={{ backgroundColor: scoreInfo.color }}
+      >
+        {product.score}
+      </div>
+
+      <ChevronRight className="h-4 w-4 shrink-0 text-gray-300" />
+    </button>
   );
 }
 
@@ -1946,66 +1807,22 @@ function PreferenceCard({ title, values, activeValues, onToggle, activeClass }) 
 
 function ProductListScreen({ title, emptyText, products, onBack, onSelect }) {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-white to-blue-50">
-      <div className="mx-auto max-w-lg px-4 py-6">
-        <button
-          onClick={onBack}
-          className="mb-6 flex items-center gap-2 font-semibold text-emerald-600"
-        >
-          <ArrowLeft className="h-5 w-5" />
-          Back
-        </button>
-
-        <h1 className="mb-6 text-3xl font-bold text-gray-900">{title}</h1>
-
-        {products.length === 0 ? (
-          <div className="rounded-xl bg-white py-12 text-center shadow">
-            <p className="text-gray-500">{emptyText}</p>
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {products.map((product) => {
-              const scoreInfo = getScoreInfo(product.score);
-
-              return (
-                <button
-                  key={product.barcode}
-                  onClick={() => onSelect(product)}
-                  className="flex w-full items-center gap-3 rounded-xl bg-white p-4 shadow"
-                >
-                  {product.image_url ? (
-                    <img
-                      src={product.image_url}
-                      alt={getProductName(product)}
-                      className="h-14 w-14 rounded object-contain bg-white"
-                    />
-                  ) : (
-                    <div className="flex h-14 w-14 items-center justify-center rounded bg-emerald-50 text-2xl">
-                      {getProductEmoji(product)}
-                    </div>
-                  )}
-
-                  <div className="flex-1 text-left">
-                    <p className="line-clamp-1 font-semibold text-gray-900">
-                      {getProductName(product)}
-                    </p>
-                    <p className="text-xs text-gray-500">
-                      {product.scannedAt || getProductBrand(product)}
-                    </p>
-                  </div>
-
-                  <div
-                    className="flex h-12 w-12 items-center justify-center rounded-full text-sm font-bold text-white"
-                    style={{ backgroundColor: scoreInfo.color }}
-                  >
-                    {product.score}
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-        )}
-      </div>
-    </div>
+    <StandardScreen title={title} onBack={onBack}>
+      {products.length === 0 ? (
+        <div className="rounded-xl bg-white py-12 text-center shadow">
+          <p className="text-gray-500">{emptyText}</p>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {products.map((product) => (
+            <ProductRow
+              key={product.barcode}
+              product={product}
+              onClick={() => onSelect(product)}
+            />
+          ))}
+        </div>
+      )}
+    </StandardScreen>
   );
 }
