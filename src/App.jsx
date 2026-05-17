@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { BrowserMultiFormatReader } from "@zxing/browser";
+import Tesseract from "tesseract.js";
 import {
   AlertTriangle,
   Apple,
@@ -9,20 +10,25 @@ import {
   Clock,
   Heart,
   Home,
+  ImagePlus,
   Leaf,
   RefreshCcw,
+  ScanBarcode,
   Search,
   ShieldCheck,
   SlidersHorizontal,
   Sparkles,
   Star,
+  Upload,
   X
 } from "lucide-react";
+import "./index.css";
 
-const ADDITIVES = {
+const ADDITIVE_DATABASE = {
   e102: { name: "Tartrazine", risk: "high", reason: "Colour additive flagged by Pinch." },
   e110: { name: "Sunset Yellow", risk: "high", reason: "Colour additive flagged by Pinch." },
   e129: { name: "Allura Red", risk: "high", reason: "Colour additive flagged by Pinch." },
+  e211: { name: "Sodium benzoate", risk: "moderate", reason: "Preservative some people prefer to avoid." },
   e250: { name: "Sodium nitrite", risk: "moderate", reason: "Preservative with usage concerns." },
   e320: { name: "BHA", risk: "high", reason: "Antioxidant flagged as high concern." },
   e321: { name: "BHT", risk: "high", reason: "Antioxidant flagged as high concern." },
@@ -271,6 +277,7 @@ function toProduct(item) {
     labels_tags: item.labels.map((label) => `en:${label}`),
     image_emoji: item.emoji,
     demo_source: true,
+    confidence: "High",
     nutriments: {
       "energy-kcal_100g": item.nutrition.kcal,
       sugars_100g: item.nutrition.sugar,
@@ -284,6 +291,11 @@ function toProduct(item) {
 
 function normalizeAdditive(tag) {
   return String(tag || "").toLowerCase().replace("en:", "").replace("additive:", "").trim();
+}
+
+function extractENumbers(text) {
+  const matches = String(text || "").toLowerCase().match(/\be\s?-?\d{3,4}[a-z]?\b/g) || [];
+  return [...new Set(matches.map((item) => item.replace(/\s|-/g, "")))];
 }
 
 function getName(product) {
@@ -307,11 +319,26 @@ function getIngredients(product) {
 }
 
 function getKind(product) {
-  const text = [product.product_type || "", product.categories || "", ...(product.categories_tags || [])]
+  const text = [
+    product.product_type || "",
+    product.categories || "",
+    ...(product.categories_tags || []),
+    product.ingredients_text || ""
+  ]
     .join(" ")
     .toLowerCase();
 
-  if (["beauty", "cosmetic", "personal care", "skincare", "hygiene"].some((term) => text.includes(term))) {
+  if (
+    text.includes("aqua") ||
+    text.includes("parfum") ||
+    text.includes("fragrance") ||
+    text.includes("glycerin") ||
+    text.includes("cosmetic") ||
+    text.includes("beauty") ||
+    text.includes("personal care") ||
+    text.includes("skincare") ||
+    text.includes("hygiene")
+  ) {
     return "cosmetic";
   }
 
@@ -364,6 +391,7 @@ function scoreFood(product) {
   const salt = getSalt(product);
   const protein = getProtein(product);
   const fibre = getFibre(product);
+  const ingredientText = getIngredients(product);
 
   if (kcal > 500) {
     nutrition -= 8;
@@ -380,6 +408,15 @@ function scoreFood(product) {
     warnings.push("High sugar");
   } else if (sugar <= 3) {
     positives.push("Low sugar");
+  }
+
+  if (ingredientText.includes("sugar") && product.confidence === "Medium") {
+    warnings.push("Sugar detected in ingredients");
+  }
+
+  if (ingredientText.includes("palm oil")) {
+    warnings.push("Contains palm oil");
+    nutrition -= 3;
   }
 
   if (satFat > 6) {
@@ -414,15 +451,18 @@ function scoreFood(product) {
     positives.push("Good protein");
   }
 
-  const additiveTags = product.additives_tags || [];
+  const additiveTags = [
+    ...(product.additives_tags || []),
+    ...extractENumbers(product.ingredients_text || "").map((code) => `en:${code}`)
+  ];
 
   if (additiveTags.length === 0) {
-    positives.push("No additives listed");
+    positives.push("No additives detected");
   }
 
-  additiveTags.forEach((tag) => {
+  [...new Set(additiveTags)].forEach((tag) => {
     const key = normalizeAdditive(tag);
-    const additive = ADDITIVES[key];
+    const additive = ADDITIVE_DATABASE[key];
 
     if (!additive) {
       additives -= 3;
@@ -453,47 +493,104 @@ function scoreFood(product) {
     positives.push("Certified organic");
   }
 
+  if (product.confidence === "Medium") {
+    nutrition = Math.min(nutrition, 45);
+    warnings.push("Provisional score based on ingredient text only");
+  }
+
   nutrition = Math.max(0, Math.min(60, nutrition));
   additives = Math.max(0, Math.min(30, additives));
 
   const total = Math.min(cap, Math.max(0, Math.min(100, Math.round(nutrition + additives + organic))));
 
-  if (warnings.length === 0) positives.push("No major concerns detected from available data");
+  if (warnings.length === 0) {
+    positives.push("No major concerns detected from available data");
+  }
 
-  return { score: total, parts: { nutrition: Math.round(nutrition), additives: Math.round(additives), organic }, warnings, positives };
+  return {
+    score: total,
+    parts: { nutrition: Math.round(nutrition), additives: Math.round(additives), organic },
+    warnings,
+    positives
+  };
 }
 
 function scoreCosmetic(product) {
   const ingredients = getIngredients(product);
   const warnings = [];
   const positives = [];
+
   let score = 90;
 
-  ["bht", "formaldehyde", "triclosan", "phthalate", "paraben"].forEach((term) => {
+  const highRisk = ["bht", "formaldehyde", "triclosan", "phthalate", "paraben"];
+  const moderateRisk = ["parfum", "fragrance", "methylisothiazolinone", "phenoxyethanol", "sodium benzoate"];
+
+  highRisk.forEach((term) => {
     if (ingredients.includes(term)) {
       score = Math.min(score, 24);
       warnings.push(`High concern ingredient: ${term}`);
     }
   });
 
-  ["parfum", "fragrance", "methylisothiazolinone", "phenoxyethanol"].forEach((term) => {
+  moderateRisk.forEach((term) => {
     if (ingredients.includes(term)) {
       score = Math.min(score, 49);
       warnings.push(`Moderate concern ingredient: ${term}`);
     }
   });
 
-  if (warnings.length === 0) positives.push("No high-risk cosmetic ingredients detected");
+  if (product.confidence === "Medium") {
+    warnings.push("Provisional score based on scanned ingredient text only");
+  }
 
-  return { score, parts: { nutrition: 0, additives: 0, organic: 0 }, warnings, positives };
+  if (warnings.length === 0) {
+    positives.push("No high-risk cosmetic ingredients detected");
+  }
+
+  return {
+    score,
+    parts: { nutrition: 0, additives: 0, organic: 0 },
+    warnings,
+    positives
+  };
 }
 
 function scoreProduct(rawProduct, barcodeOverride) {
-  const barcode = barcodeOverride || rawProduct.code || rawProduct.barcode || "unknown";
+  const barcode = barcodeOverride || rawProduct.code || rawProduct.barcode || "ingredient-scan";
   const kind = getKind(rawProduct);
   const scored = kind === "cosmetic" ? scoreCosmetic(rawProduct) : scoreFood(rawProduct);
 
-  return { ...rawProduct, barcode, productKind: kind, score: scored.score, scoreParts: scored.parts, warnings: scored.warnings, positives: scored.positives, scannedAt: new Date().toLocaleDateString() };
+  return {
+    ...rawProduct,
+    barcode,
+    productKind: kind,
+    score: scored.score,
+    scoreParts: scored.parts,
+    warnings: scored.warnings,
+    positives: scored.positives,
+    scannedAt: new Date().toLocaleDateString()
+  };
+}
+
+function createIngredientProduct(text) {
+  const trimmed = String(text || "").trim();
+
+  return scoreProduct({
+    code: `ingredients-${Date.now()}`,
+    barcode: `ingredients-${Date.now()}`,
+    product_name: "Scanned Ingredients",
+    demo_short_name: "Ingredient Scan",
+    brands: "Photo OCR",
+    categories: getKind({ ingredients_text: trimmed }) === "cosmetic" ? "Cosmetic / hygiene label" : "Food label",
+    product_type: getKind({ ingredients_text: trimmed }),
+    ingredients_text: trimmed,
+    additives_tags: extractENumbers(trimmed).map((code) => `en:${code}`),
+    labels_tags: [],
+    image_emoji: "📸",
+    demo_source: false,
+    confidence: "Medium",
+    nutriments: {}
+  });
 }
 
 function getScoreMeta(score) {
@@ -507,7 +604,9 @@ function getScoreMeta(score) {
 function getRecommendations(product) {
   const demoProducts = DEMO_PRODUCTS.map(toProduct).map((item) => scoreProduct(item, item.barcode));
 
-  if (!product) return demoProducts.sort((a, b) => b.score - a.score).slice(0, 8);
+  if (!product) {
+    return demoProducts.sort((a, b) => b.score - a.score).slice(0, 8);
+  }
 
   const sameKind = demoProducts
     .filter((item) => item.barcode !== product.barcode)
@@ -527,14 +626,27 @@ function getRecommendations(product) {
 
 function findDemo(query) {
   const q = String(query || "").trim().toLowerCase();
+
   if (!q) return null;
 
-  return DEMO_PRODUCTS.find((item) => item.barcode === q || item.name.toLowerCase().includes(q) || item.shortName.toLowerCase().includes(q) || item.brand.toLowerCase().includes(q) || item.category.toLowerCase().includes(q));
+  return DEMO_PRODUCTS.find((item) => {
+    return (
+      item.barcode === q ||
+      item.name.toLowerCase().includes(q) ||
+      item.shortName.toLowerCase().includes(q) ||
+      item.brand.toLowerCase().includes(q) ||
+      item.category.toLowerCase().includes(q)
+    );
+  });
 }
 
 function toggleArray(object, key, value) {
   const exists = object[key].includes(value);
-  return { ...object, [key]: exists ? object[key].filter((item) => item !== value) : [...object[key], value] };
+
+  return {
+    ...object,
+    [key]: exists ? object[key].filter((item) => item !== value) : [...object[key], value]
+  };
 }
 
 export default function App() {
@@ -546,12 +658,19 @@ export default function App() {
   const [compare, setCompare] = useState([]);
   const [tab, setTab] = useState("overview");
   const [loading, setLoading] = useState(false);
+  const [ocrLoading, setOcrLoading] = useState(false);
+  const [ocrText, setOcrText] = useState("");
   const [scannerStatus, setScannerStatus] = useState("Camera is optional. Manual search is reliable.");
   const [scannerKey, setScannerKey] = useState(0);
   const [error, setError] = useState("");
-  const [preferences, setPreferences] = useState({ avoid: ["palm oil", "parfum", "bht"], allergens: ["milk", "peanuts", "gluten"] });
+  const [preferences, setPreferences] = useState({
+    avoid: ["palm oil", "parfum", "bht"],
+    allergens: ["milk", "peanuts", "gluten"]
+  });
 
   const videoRef = useRef(null);
+  const ingredientInputRef = useRef(null);
+  const scannerIngredientInputRef = useRef(null);
   const lockRef = useRef(false);
 
   const recommendations = useMemo(() => getRecommendations(currentProduct), [currentProduct]);
@@ -562,11 +681,15 @@ export default function App() {
     const alerts = [];
 
     preferences.avoid.forEach((item) => {
-      if (ingredients.includes(item.toLowerCase())) alerts.push(`Contains avoided ingredient: ${item}`);
+      if (ingredients.includes(item.toLowerCase())) {
+        alerts.push(`Contains avoided ingredient: ${item}`);
+      }
     });
 
     preferences.allergens.forEach((item) => {
-      if (ingredients.includes(item.toLowerCase())) alerts.push(`Potential allergen: ${item}`);
+      if (ingredients.includes(item.toLowerCase())) {
+        alerts.push(`Potential allergen: ${item}`);
+      }
     });
 
     return { ...product, alerts };
@@ -606,7 +729,8 @@ export default function App() {
       const data = await response.json();
 
       if (data?.status === 1 && data?.product) {
-        openProduct(scoreProduct(data.product, barcode));
+        const product = scoreProduct({ ...data.product, confidence: "High" }, barcode);
+        openProduct(product);
       } else if (localMatch) {
         openProduct(scoreProduct(toProduct(localMatch), localMatch.barcode));
       } else {
@@ -616,11 +740,43 @@ export default function App() {
       if (localMatch) {
         openProduct(scoreProduct(toProduct(localMatch), localMatch.barcode));
       } else {
-        setError("Product not found. Try one of the demo products below.");
+        setError("Product not found. Try a demo product or scan ingredients.");
       }
     } finally {
       setLoading(false);
       lockRef.current = false;
+    }
+  }
+
+  async function handleIngredientImage(file) {
+    if (!file) return;
+
+    setError("");
+    setOcrLoading(true);
+    setOcrText("");
+
+    try {
+      const result = await Tesseract.recognize(file, "eng", {
+        logger: (message) => {
+          if (message.status === "recognizing text") {
+            const percent = Math.round((message.progress || 0) * 100);
+            setOcrText(`Reading label... ${percent}%`);
+          }
+        }
+      });
+
+      const text = result?.data?.text || "";
+
+      if (!text.trim()) {
+        throw new Error("No text found");
+      }
+
+      setOcrText(text);
+      openProduct(createIngredientProduct(text));
+    } catch {
+      setError("Could not read the ingredient photo. Try a clearer, closer picture with good light.");
+    } finally {
+      setOcrLoading(false);
     }
   }
 
@@ -631,13 +787,13 @@ export default function App() {
     let cancelled = false;
 
     async function startScanner() {
-      setScannerStatus("Opening camera. If it does not read, use manual search.");
+      setScannerStatus("Opening camera. If it does not read, use manual search or scan ingredients.");
       setError("");
       lockRef.current = false;
 
       try {
         if (!navigator.mediaDevices?.getUserMedia || !videoRef.current) {
-          setScannerStatus("Camera not available. Use manual search.");
+          setScannerStatus("Camera not available. Use manual search or scan ingredients.");
           return;
         }
 
@@ -657,6 +813,7 @@ export default function App() {
 
           if (result) {
             const barcode = result.getText();
+
             if (barcode) {
               lockRef.current = true;
               setScannerStatus(`Found ${barcode}`);
@@ -668,7 +825,7 @@ export default function App() {
 
         setScannerStatus("Point at barcode. Hold steady for 2 seconds.");
       } catch {
-        setScannerStatus("Camera scanner could not start. Use manual search.");
+        setScannerStatus("Camera scanner could not start. Use manual search or scan ingredients.");
       }
     }
 
@@ -690,7 +847,9 @@ export default function App() {
 
     setFavorites((prev) => {
       const exists = prev.some((item) => item.barcode === product.barcode);
+
       if (exists) return prev.filter((item) => item.barcode !== product.barcode);
+
       return [product, ...prev];
     });
   }
@@ -700,6 +859,7 @@ export default function App() {
 
     setCompare((prev) => {
       if (prev.some((item) => item.barcode === product.barcode)) return prev;
+
       return [product, ...prev].slice(0, 3);
     });
 
@@ -726,23 +886,68 @@ export default function App() {
           <section className="hero-card">
             <div className="logo-bubble">P</div>
             <h2>Scan smarter. Shop prettier.</h2>
-            <p>Understand food, beauty, and personal care products with clear scores, alerts, and better alternatives.</p>
+            <p>Barcode not reading? No drama. Search manually or snap the ingredient label.</p>
 
             <div className="hero-actions">
               <button className="primary-btn" onClick={() => setScreen("search")}>
                 <Search size={20} />
-                Search product
+                Enter manually
               </button>
 
               <button className="secondary-btn" onClick={() => setScreen("scanner")}>
-                <Camera size={20} />
-                Open camera
+                <ScanBarcode size={20} />
+                Take picture of barcode
               </button>
+
+              <button className="tertiary-btn" onClick={() => ingredientInputRef.current?.click()}>
+                <ImagePlus size={20} />
+                Take picture of ingredients
+              </button>
+
+              <input
+                ref={ingredientInputRef}
+                type="file"
+                accept="image/*"
+                capture="environment"
+                hidden
+                onChange={(event) => handleIngredientImage(event.target.files?.[0])}
+              />
             </div>
+
+            {ocrLoading && <div className="mini-loading">{ocrText || "Reading label..."}</div>}
+            {error && <div className="error-box">{error}</div>}
+          </section>
+
+          <section className="choice-grid">
+            <ChoiceCard
+              icon={<ScanBarcode />}
+              title="Take picture of barcode"
+              text="Try the live scanner. Best with good light and a flat barcode."
+              onClick={() => setScreen("scanner")}
+            />
+            <ChoiceCard
+              icon={<Search />}
+              title="Enter manually"
+              text="Type the barcode or search by name. Most reliable for MVP."
+              onClick={() => setScreen("search")}
+            />
+            <ChoiceCard
+              icon={<ImagePlus />}
+              title="Picture of ingredients"
+              text="OCR reads the label and creates a provisional analysis."
+              onClick={() => ingredientInputRef.current?.click()}
+            />
           </section>
 
           <section className="story-strip">
-            {[["Food", "🍝"], ["Beauty", "🧴"], ["Snacks", "🍪"], ["Drinks", "🥤"], ["Protein", "💪"], ["Avoid", "⚠️"]].map(([label, emoji]) => (
+            {[
+              ["Food", "🍝"],
+              ["Beauty", "🧴"],
+              ["Snacks", "🍪"],
+              ["Drinks", "🥤"],
+              ["Protein", "💪"],
+              ["Avoid", "⚠️"]
+            ].map(([label, emoji]) => (
               <button key={label} className="story-pill" onClick={() => setScreen("search")}>
                 <span>{emoji}</span>
                 {label}
@@ -785,8 +990,8 @@ export default function App() {
           <BackButton onClick={() => setScreen("home")} />
 
           <section className="search-card">
-            <h2>Search or enter barcode</h2>
-            <p>Manual search is the most reliable MVP flow. Try a barcode, product name, or tap a product below.</p>
+            <h2>Enter manually</h2>
+            <p>Type a barcode, product name, or choose one below. This is the most reliable flow for now.</p>
 
             <form
               className="search-form"
@@ -795,10 +1000,28 @@ export default function App() {
                 searchProduct(query);
               }}
             >
-              <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Try 5201083348903, Nutella, yogurt..." inputMode="search" />
+              <input
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder="Try 5201083348903, Nutella, yogurt..."
+                inputMode="search"
+              />
+
               <button disabled={loading}>{loading ? "Searching..." : "Search"}</button>
             </form>
 
+            <div className="inline-options">
+              <button onClick={() => setScreen("scanner")}>
+                <ScanBarcode size={18} />
+                Barcode photo
+              </button>
+              <button onClick={() => ingredientInputRef.current?.click()}>
+                <ImagePlus size={18} />
+                Ingredients photo
+              </button>
+            </div>
+
+            {ocrLoading && <div className="mini-loading">{ocrText || "Reading label..."}</div>}
             {error && <div className="error-box">{error}</div>}
           </section>
 
@@ -811,9 +1034,25 @@ export default function App() {
           <div className="grid-products">
             {DEMO_PRODUCTS.map((item) => {
               const product = scoreProduct(toProduct(item), item.barcode);
-              return <ProductTile key={item.barcode} product={product} onClick={() => searchProduct(item.barcode, item)} />;
+
+              return (
+                <ProductTile
+                  key={item.barcode}
+                  product={product}
+                  onClick={() => searchProduct(item.barcode, item)}
+                />
+              );
             })}
           </div>
+
+          <input
+            ref={ingredientInputRef}
+            type="file"
+            accept="image/*"
+            capture="environment"
+            hidden
+            onChange={(event) => handleIngredientImage(event.target.files?.[0])}
+          />
         </main>
       )}
 
@@ -821,18 +1060,32 @@ export default function App() {
         <main className="scanner-page">
           <div className="scanner-video-wrap">
             <video ref={videoRef} autoPlay playsInline muted className="scanner-video" />
+
             <div className="scanner-frame" />
+
             <button className="scanner-close" onClick={() => setScreen("home")}>
               <X size={22} />
             </button>
 
             <div className="scanner-caption">
-              <h2>Point at barcode</h2>
+              <h2>Take picture of barcode</h2>
               <p>{scannerStatus}</p>
             </div>
           </div>
 
           <section className="scanner-panel">
+            <div className="scanner-choice-row">
+              <button onClick={() => setScannerKey((key) => key + 1)}>
+                <RefreshCcw size={18} />
+                Restart barcode
+              </button>
+
+              <button onClick={() => scannerIngredientInputRef.current?.click()}>
+                <ImagePlus size={18} />
+                Ingredients
+              </button>
+            </div>
+
             <form
               className="search-form dark"
               onSubmit={(event) => {
@@ -840,14 +1093,18 @@ export default function App() {
                 searchProduct(query);
               }}
             >
-              <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Or enter barcode..." inputMode="numeric" />
+              <input
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder="Or enter barcode manually..."
+                inputMode="numeric"
+              />
+
               <button disabled={loading || !query.trim()}>{loading ? "Searching..." : "Search"}</button>
             </form>
 
-            <button className="restart-btn" onClick={() => setScannerKey((key) => key + 1)}>
-              <RefreshCcw size={18} />
-              Restart camera
-            </button>
+            {ocrLoading && <div className="scanner-loading">{ocrText || "Reading label..."}</div>}
+            {error && <div className="scanner-error">{error}</div>}
 
             <div className="scanner-products">
               {DEMO_PRODUCTS.slice(0, 8).map((item) => (
@@ -857,6 +1114,15 @@ export default function App() {
                 </button>
               ))}
             </div>
+
+            <input
+              ref={scannerIngredientInputRef}
+              type="file"
+              accept="image/*"
+              capture="environment"
+              hidden
+              onChange={(event) => handleIngredientImage(event.target.files?.[0])}
+            />
           </section>
         </main>
       )}
@@ -867,7 +1133,11 @@ export default function App() {
 
           <section className={`result-hero ${getScoreMeta(currentProduct.score).tone}`}>
             <div className="product-image-card">
-              {currentProduct.image_url ? <img src={currentProduct.image_url} alt={getName(currentProduct)} /> : <span>{getEmoji(currentProduct)}</span>}
+              {currentProduct.image_url ? (
+                <img src={currentProduct.image_url} alt={getName(currentProduct)} />
+              ) : (
+                <span>{getEmoji(currentProduct)}</span>
+              )}
             </div>
 
             <div className="score-orb" style={{ backgroundColor: getScoreMeta(currentProduct.score).color }}>
@@ -880,11 +1150,16 @@ export default function App() {
             <p className="score-label">
               {getScoreMeta(currentProduct.score).label} · {currentProduct.productKind === "food" ? "Food analysis" : "Cosmetic analysis"}
             </p>
+
+            {currentProduct.confidence === "Medium" && (
+              <div className="confidence-pill">Provisional result · Ingredient scan only</div>
+            )}
           </section>
 
           {currentProduct.alerts?.length > 0 && (
             <section className="alert-card">
               <AlertTriangle size={20} />
+
               <div>
                 <h3>Your alerts</h3>
                 {currentProduct.alerts.map((item) => (
@@ -905,7 +1180,10 @@ export default function App() {
           {tab === "overview" && (
             <section className="content-card">
               <h3>Why this score?</h3>
-              <p className="muted">Pinch evaluates the product using available label data. Food scoring checks nutrition, additives, and labels. Cosmetic scoring checks ingredient concerns.</p>
+
+              <p className="muted">
+                Pinch evaluates the product using available label data. Barcode results are stronger. Ingredient photos create a provisional result.
+              </p>
 
               {currentProduct.productKind === "food" && (
                 <div className="score-breakdown">
@@ -923,7 +1201,8 @@ export default function App() {
           {tab === "nutrition" && (
             <section className="content-card">
               <h3>Nutrition per 100g</h3>
-              {currentProduct.productKind === "food" ? (
+
+              {currentProduct.productKind === "food" && currentProduct.confidence !== "Medium" ? (
                 <div className="metric-grid">
                   <Metric label="Calories" value={`${Math.round(getKcal(currentProduct))} kcal`} />
                   <Metric label="Sugar" value={`${getSugar(currentProduct).toFixed(1)}g`} />
@@ -933,7 +1212,7 @@ export default function App() {
                   <Metric label="Fibre" value={`${getFibre(currentProduct).toFixed(1)}g`} />
                 </div>
               ) : (
-                <p className="muted">Nutrition does not apply to cosmetic or hygiene products.</p>
+                <p className="muted">Nutrition needs a barcode result or a nutrition table scan. This result is based on ingredients only.</p>
               )}
             </section>
           )}
@@ -941,20 +1220,23 @@ export default function App() {
           {tab === "ingredients" && (
             <section className="content-card">
               <h3>Ingredients</h3>
+
               <p className="ingredient-text">{currentProduct.ingredients_text || "No ingredient list available."}</p>
+
               <h3 className="spaced">Additives</h3>
 
               {(currentProduct.additives_tags || []).length > 0 ? (
                 <div className="additive-list">
                   {currentProduct.additives_tags.map((tag) => {
                     const key = normalizeAdditive(tag);
-                    const additive = ADDITIVES[key];
+                    const additive = ADDITIVE_DATABASE[key];
 
                     return (
                       <div key={tag} className={`additive ${additive?.risk || "unknown"}`}>
                         <strong>
                           {key.toUpperCase()} {additive ? `· ${additive.name}` : ""}
                         </strong>
+
                         <span>{additive?.reason || "Not classified in prototype database."}</span>
                       </div>
                     );
@@ -969,6 +1251,7 @@ export default function App() {
           {tab === "alternatives" && (
             <section className="content-card">
               <h3>Healthier alternatives</h3>
+
               <p className="muted">Independent recommendations based on higher scores and similar product type.</p>
 
               {recommendations.length > 0 ? (
@@ -1005,49 +1288,84 @@ export default function App() {
       {screen === "history" && (
         <main className="page">
           <BackButton onClick={() => setScreen("home")} />
+
           <section className="content-card intro">
             <h2>History</h2>
             <p>Pinch remembers scanned products with easy colour-coded scores.</p>
           </section>
 
-          {history.length === 0 ? <EmptyState text="No scans yet." /> : <div className="list-stack">{history.map((item) => <ProductRow key={item.barcode} product={item} onClick={() => openProduct(item)} />)}</div>}
+          {history.length === 0 ? (
+            <EmptyState text="No scans yet." />
+          ) : (
+            <div className="list-stack">
+              {history.map((item) => (
+                <ProductRow key={item.barcode} product={item} onClick={() => openProduct(item)} />
+              ))}
+            </div>
+          )}
         </main>
       )}
 
       {screen === "recommendations" && (
         <main className="page">
           <BackButton onClick={() => setScreen("home")} />
+
           <section className="content-card intro">
             <h2>Recommendations</h2>
             <p>Better alternatives based on higher scores, not paid placement.</p>
           </section>
 
-          <div className="grid-products">{getRecommendations(currentProduct).map((item) => <ProductTile key={item.barcode} product={item} onClick={() => openProduct(item)} />)}</div>
+          <div className="grid-products">
+            {getRecommendations(currentProduct).map((item) => (
+              <ProductTile key={item.barcode} product={item} onClick={() => openProduct(item)} />
+            ))}
+          </div>
         </main>
       )}
 
       {screen === "settings" && (
         <main className="page">
           <BackButton onClick={() => setScreen("home")} />
+
           <section className="content-card intro">
             <h2>Personal alerts</h2>
             <p>Pinch separates general product score from what matters personally to you.</p>
           </section>
 
-          <PreferenceEditor title="Avoid ingredients" values={["palm oil", "parfum", "bht", "sugar", "gluten"]} selected={preferences.avoid} onToggle={(value) => setPreferences((prev) => toggleArray(prev, "avoid", value))} />
-          <PreferenceEditor title="Allergens" values={["milk", "peanuts", "gluten", "soy", "eggs", "tree nuts"]} selected={preferences.allergens} onToggle={(value) => setPreferences((prev) => toggleArray(prev, "allergens", value))} />
+          <PreferenceEditor
+            title="Avoid ingredients"
+            values={["palm oil", "parfum", "bht", "sugar", "gluten"]}
+            selected={preferences.avoid}
+            onToggle={(value) => setPreferences((prev) => toggleArray(prev, "avoid", value))}
+          />
+
+          <PreferenceEditor
+            title="Allergens"
+            values={["milk", "peanuts", "gluten", "soy", "eggs", "tree nuts"]}
+            selected={preferences.allergens}
+            onToggle={(value) => setPreferences((prev) => toggleArray(prev, "allergens", value))}
+          />
         </main>
       )}
 
       {screen === "compare" && (
         <main className="page">
           <BackButton onClick={() => setScreen("home")} />
+
           <section className="content-card intro">
             <h2>Compare</h2>
             <p>Choose up to 3 products and compare scores side by side.</p>
           </section>
 
-          {compare.length === 0 ? <EmptyState text="No products added to compare yet." /> : <div className="compare-grid">{compare.map((item) => <ProductTile key={item.barcode} product={item} onClick={() => openProduct(item)} />)}</div>}
+          {compare.length === 0 ? (
+            <EmptyState text="No products added to compare yet." />
+          ) : (
+            <div className="compare-grid">
+              {compare.map((item) => (
+                <ProductTile key={item.barcode} product={item} onClick={() => openProduct(item)} />
+              ))}
+            </div>
+          )}
         </main>
       )}
 
@@ -1088,6 +1406,18 @@ function SectionHeader({ title, action, onAction }) {
   );
 }
 
+function ChoiceCard({ icon, title, text, onClick }) {
+  return (
+    <button className="choice-card" onClick={onClick}>
+      <div className="choice-icon">{icon}</div>
+      <div>
+        <strong>{title}</strong>
+        <span>{text}</span>
+      </div>
+    </button>
+  );
+}
+
 function FeatureCard({ icon, title, text }) {
   return (
     <div className="feature-card">
@@ -1117,10 +1447,12 @@ function ProductTile({ product, onClick }) {
   return (
     <button className="product-tile" onClick={onClick}>
       <span className="tile-emoji">{getEmoji(product)}</span>
+
       <div>
         <strong>{getName(product)}</strong>
         <small>{getBrand(product)}</small>
       </div>
+
       <span className={`tile-score ${meta.tone}`}>{product.score}</span>
     </button>
   );
@@ -1132,12 +1464,14 @@ function ProductRow({ product, onClick }) {
   return (
     <button className="product-row" onClick={onClick}>
       <div className="row-emoji">{getEmoji(product)}</div>
+
       <div className="row-info">
         <strong>{getName(product)}</strong>
         <small>
           {getBrand(product)} · {meta.label}
         </small>
       </div>
+
       <span className={`row-score ${meta.tone}`}>{product.score}</span>
       <ChevronRight size={16} />
     </button>
@@ -1155,6 +1489,7 @@ function Breakdown({ label, value, max }) {
           {value}/{max}
         </strong>
       </div>
+
       <div className="break-track">
         <div style={{ width }} />
       </div>
@@ -1168,6 +1503,7 @@ function SignalList({ title, items, type }) {
   return (
     <div className={`signal-list ${type}`}>
       <h4>{title}</h4>
+
       {items.map((item) => (
         <p key={item}>• {item}</p>
       ))}
@@ -1188,6 +1524,7 @@ function PreferenceEditor({ title, values, selected, onToggle }) {
   return (
     <section className="content-card">
       <h3>{title}</h3>
+
       <div className="preference-cloud">
         {values.map((value) => (
           <button key={value} className={selected.includes(value) ? "selected" : ""} onClick={() => onToggle(value)}>
