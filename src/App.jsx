@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
+import { BrowserMultiFormatReader } from "@zxing/browser";
 import {
   ArrowLeft,
   Bell,
@@ -10,17 +11,61 @@ import {
 } from "lucide-react";
 
 const ADDITIVE_DATABASE = {
-  e102: { name: "Tartrazine", risk: "high", concerns: ["allergen", "hyperactivity"] },
-  e110: { name: "Sunset Yellow", risk: "high", concerns: ["allergen", "hyperactivity"] },
-  e129: { name: "Allura Red", risk: "high", concerns: ["allergen", "hyperactivity"] },
-  e250: { name: "Sodium nitrite", risk: "moderate", concerns: ["cancer concern"] },
-  e251: { name: "Sodium nitrate", risk: "moderate", concerns: ["cancer concern"] },
-  e320: { name: "BHA", risk: "high", concerns: ["carcinogenic concern"] },
-  e321: { name: "BHT", risk: "high", concerns: ["carcinogenic concern"] },
-  e621: { name: "Monosodium glutamate", risk: "moderate", concerns: ["sensitivity"] },
-  e627: { name: "Disodium guanylate", risk: "moderate", concerns: ["sensitivity"] },
-  e631: { name: "Disodium inosinate", risk: "moderate", concerns: ["sensitivity"] },
-  e635: { name: "Disodium 5-ribonucleotide", risk: "moderate", concerns: ["sensitivity"] }
+  e102: {
+    name: "Tartrazine",
+    risk: "high",
+    concerns: ["allergen", "hyperactivity"]
+  },
+  e110: {
+    name: "Sunset Yellow",
+    risk: "high",
+    concerns: ["allergen", "hyperactivity"]
+  },
+  e129: {
+    name: "Allura Red",
+    risk: "high",
+    concerns: ["allergen", "hyperactivity"]
+  },
+  e250: {
+    name: "Sodium nitrite",
+    risk: "moderate",
+    concerns: ["cancer concern"]
+  },
+  e251: {
+    name: "Sodium nitrate",
+    risk: "moderate",
+    concerns: ["cancer concern"]
+  },
+  e320: {
+    name: "BHA",
+    risk: "high",
+    concerns: ["carcinogenic concern"]
+  },
+  e321: {
+    name: "BHT",
+    risk: "high",
+    concerns: ["carcinogenic concern"]
+  },
+  e621: {
+    name: "Monosodium glutamate",
+    risk: "moderate",
+    concerns: ["sensitivity"]
+  },
+  e627: {
+    name: "Disodium guanylate",
+    risk: "moderate",
+    concerns: ["sensitivity"]
+  },
+  e631: {
+    name: "Disodium inosinate",
+    risk: "moderate",
+    concerns: ["sensitivity"]
+  },
+  e635: {
+    name: "Disodium 5-ribonucleotide",
+    risk: "moderate",
+    concerns: ["sensitivity"]
+  }
 };
 
 const DEMO_BARCODES = [
@@ -35,6 +80,10 @@ const DEMO_BARCODES = [
   {
     name: "Kinder Bueno",
     barcode: "8000500037560"
+  },
+  {
+    name: "Greek yogurt",
+    barcode: "5201083348903"
   }
 ];
 
@@ -47,7 +96,12 @@ function normaliseAdditiveTag(tag) {
 }
 
 function getProductName(product) {
-  return product.product_name || product.product_name_en || product.generic_name || "Unknown product";
+  return (
+    product.product_name ||
+    product.product_name_en ||
+    product.generic_name ||
+    "Unknown product"
+  );
 }
 
 function getProductBrand(product) {
@@ -55,22 +109,48 @@ function getProductBrand(product) {
 }
 
 function getIngredientText(product) {
-  return String(product.ingredients_text || product.ingredients_text_en || "").toLowerCase();
+  return String(
+    product.ingredients_text ||
+      product.ingredients_text_en ||
+      product.ingredients_text_with_allergens ||
+      ""
+  ).toLowerCase();
 }
 
 function getEnergyKcal(product) {
   const nutriments = product.nutriments || {};
-  return Number(
+
+  const directKcal =
     nutriments["energy-kcal_100g"] ||
-      nutriments.energy_kcal_100g ||
-      nutriments.energy_100g / 4.184 ||
-      0
-  );
+    nutriments.energy_kcal_100g ||
+    nutriments.energy_kcal ||
+    0;
+
+  if (directKcal) {
+    return Number(directKcal);
+  }
+
+  const energyKj = nutriments.energy_100g || 0;
+
+  if (energyKj) {
+    return Number(energyKj) / 4.184;
+  }
+
+  return 0;
 }
 
 function getSalt(product) {
   const nutriments = product.nutriments || {};
-  return Number(nutriments.salt_100g || nutriments.sodium_100g * 2.5 || 0);
+
+  if (nutriments.salt_100g) {
+    return Number(nutriments.salt_100g);
+  }
+
+  if (nutriments.sodium_100g) {
+    return Number(nutriments.sodium_100g) * 2.5;
+  }
+
+  return 0;
 }
 
 function calculateFoodScore(product) {
@@ -78,7 +158,6 @@ function calculateFoodScore(product) {
     nutrition: 0,
     additives: 0,
     organic: 0,
-    reasons: [],
     warnings: [],
     positives: []
   };
@@ -88,10 +167,18 @@ function calculateFoodScore(product) {
 
   const energyKcal = getEnergyKcal(product);
   const sugars = Number(nutriments.sugars_100g || 0);
-  const saturatedFat = Number(nutriments["saturated-fat_100g"] || nutriments.saturated_fat_100g || 0);
+  const saturatedFat = Number(
+    nutriments["saturated-fat_100g"] ||
+      nutriments.saturated_fat_100g ||
+      0
+  );
   const salt = getSalt(product);
-  const fiber = Number(nutriments.fiber_100g || nutriments.fibre_100g || 0);
-  const protein = Number(nutriments.proteins_100g || nutriments.protein_100g || 0);
+  const fibre = Number(nutriments.fiber_100g || nutriments.fibre_100g || 0);
+  const protein = Number(
+    nutriments.proteins_100g ||
+      nutriments.protein_100g ||
+      0
+  );
 
   if (energyKcal > 500) {
     nutritionScore -= 8;
@@ -126,10 +213,10 @@ function calculateFoodScore(product) {
     details.warnings.push("High salt");
   }
 
-  if (fiber > 5) {
+  if (fibre > 5) {
     nutritionScore += 8;
     details.positives.push("Excellent fibre");
-  } else if (fiber > 3) {
+  } else if (fibre > 3) {
     nutritionScore += 5;
     details.positives.push("Good fibre");
   }
@@ -221,25 +308,43 @@ function calculateCosmeticScore(product) {
 
   let score = 100;
   const ingredientText = getIngredientText(product);
-  const highRiskTerms = ["paraben", "phthalate", "triclosan", "formaldehyde", "bht"];
-  const moderateRiskTerms = ["parfum", "fragrance", "methylisothiazolinone"];
 
-  const hasHighRisk = highRiskTerms.some((term) => ingredientText.includes(term));
-  const hasModerateRisk = moderateRiskTerms.some((term) => ingredientText.includes(term));
+  const highRiskTerms = [
+    "paraben",
+    "phthalate",
+    "triclosan",
+    "formaldehyde",
+    "bht"
+  ];
+
+  const moderateRiskTerms = [
+    "parfum",
+    "fragrance",
+    "methylisothiazolinone"
+  ];
+
+  const hasHighRisk = highRiskTerms.some((term) =>
+    ingredientText.includes(term)
+  );
+
+  const hasModerateRisk = moderateRiskTerms.some((term) =>
+    ingredientText.includes(term)
+  );
 
   if (hasHighRisk) {
     score = Math.min(score, 24);
-    details.warnings.push("Contains high-risk cosmetic ingredients in this prototype model");
+    details.warnings.push(
+      "Contains high-risk cosmetic ingredients in this prototype model"
+    );
   } else if (hasModerateRisk) {
     score = Math.min(score, 49);
-    details.warnings.push("Contains moderate-risk cosmetic ingredients or fragrance concerns");
+    details.warnings.push(
+      "Contains moderate-risk cosmetic ingredients or fragrance concerns"
+    );
   } else {
-    details.positives.push("No high-risk cosmetic ingredients detected from available data");
-  }
-
-  if (product.ecoscore_grade && ["a", "b"].includes(String(product.ecoscore_grade).toLowerCase())) {
-    score += 5;
-    details.positives.push("Good eco-score");
+    details.positives.push(
+      "No high-risk cosmetic ingredients detected from available data"
+    );
   }
 
   score = Math.max(0, Math.min(100, score));
@@ -295,7 +400,7 @@ function getScoreInfo(score) {
   };
 }
 
-function App() {
+export default function App() {
   const [screen, setScreen] = useState("home");
   const [products, setProducts] = useState([]);
   const [currentProduct, setCurrentProduct] = useState(null);
@@ -308,8 +413,7 @@ function App() {
   const [userPreferences, setUserPreferences] = useState({
     allergens: ["gluten", "peanuts", "milk"],
     dietary: ["vegetarian"],
-    avoidIngredients: ["palm oil"],
-    isPremium: false
+    avoidIngredients: ["palm oil"]
   });
 
   const videoRef = useRef(null);
@@ -354,7 +458,9 @@ function App() {
     setError("");
 
     try {
-      const response = await fetch(`https://world.openfoodfacts.org/api/v0/product/${cleanBarcode}.json`);
+      const response = await fetch(
+        `https://world.openfoodfacts.org/api/v0/product/${cleanBarcode}.json`
+      );
 
       if (!response.ok) {
         throw new Error("Product not found");
@@ -367,13 +473,24 @@ function App() {
       }
 
       const product = data.product;
-      const categories = String(product.categories || product.categories_tags || "").toLowerCase();
-      const isCosmetic =
-        product.product_type === "beauty" ||
-        categories.includes("beauty") ||
-        categories.includes("cosmetic");
 
-      const scoring = isCosmetic ? calculateCosmeticScore(product) : calculateFoodScore(product);
+      const categoryText = [
+        product.product_type || "",
+        product.categories || "",
+        ...(product.categories_tags || [])
+      ]
+        .join(" ")
+        .toLowerCase();
+
+      const isCosmetic =
+        categoryText.includes("beauty") ||
+        categoryText.includes("cosmetic") ||
+        categoryText.includes("personal care");
+
+      const scoring = isCosmetic
+        ? calculateCosmeticScore(product)
+        : calculateFoodScore(product);
+
       const userAlerts = checkUserAlerts(product);
 
       const productWithScore = {
@@ -387,13 +504,14 @@ function App() {
       };
 
       setCurrentProduct(productWithScore);
+
       setProducts((previousProducts) => [
         productWithScore,
         ...previousProducts.filter((item) => item.barcode !== cleanBarcode)
       ]);
 
       setScreen("result");
-    } catch (err) {
+    } catch {
       setError("Product not found. Check the barcode and try again.");
     } finally {
       setLoading(false);
@@ -406,74 +524,73 @@ function App() {
       return undefined;
     }
 
-    let stream;
+    let controls;
     let cancelled = false;
-    let timer;
 
-    async function startCamera() {
+    async function startScanner() {
+      setError("");
+      setCameraActive(false);
+      scanLockRef.current = false;
+
       try {
         if (!navigator.mediaDevices?.getUserMedia) {
-          setError("Camera is not available in this browser. Use manual barcode entry.");
+          setError(
+            "Camera is not available in this browser. Use manual barcode entry."
+          );
           return;
         }
 
-        stream = await navigator.mediaDevices.getUserMedia({
-          video: {
-            facingMode: "environment"
-          }
-        });
-
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream;
-          setCameraActive(true);
+        if (!videoRef.current) {
+          setError("Camera preview is not ready. Use manual barcode entry.");
+          return;
         }
 
-        if ("BarcodeDetector" in window) {
-          const detector = new window.BarcodeDetector({
-            formats: ["ean_13", "ean_8", "upc_a", "upc_e"]
-          });
+        const codeReader = new BrowserMultiFormatReader();
 
-          const scanLoop = async () => {
-            if (cancelled) {
+        controls = await codeReader.decodeFromVideoDevice(
+          undefined,
+          videoRef.current,
+          (result, scanError, scannerControls) => {
+            if (cancelled || scanLockRef.current) {
               return;
             }
 
-            try {
-              if (
-                videoRef.current &&
-                videoRef.current.readyState >= 2 &&
-                !scanLockRef.current
-              ) {
-                const codes = await detector.detect(videoRef.current);
+            if (result) {
+              const barcode = result.getText();
 
-                if (codes.length > 0 && codes[0].rawValue) {
-                  scanLockRef.current = true;
-                  fetchProduct(codes[0].rawValue);
-                  return;
+              if (barcode) {
+                scanLockRef.current = true;
+
+                if (scannerControls) {
+                  scannerControls.stop();
                 }
+
+                fetchProduct(barcode);
               }
-            } catch {
-              // Browser barcode detection can fail quietly. Manual entry remains available.
             }
+          }
+        );
 
-            timer = window.setTimeout(scanLoop, 700);
-          };
-
-          scanLoop();
+        if (!cancelled) {
+          setCameraActive(true);
         }
       } catch {
-        setError("Camera access denied. Use manual barcode entry instead.");
+        setError("Scanner could not start. Use manual barcode entry instead.");
       }
     }
 
-    startCamera();
+    startScanner();
 
     return () => {
       cancelled = true;
-      window.clearTimeout(timer);
+      scanLockRef.current = false;
 
-      if (stream) {
-        stream.getTracks().forEach((track) => track.stop());
+      if (controls) {
+        controls.stop();
+      }
+
+      if (videoRef.current?.srcObject) {
+        videoRef.current.srcObject.getTracks().forEach((track) => track.stop());
       }
 
       setCameraActive(false);
@@ -481,7 +598,9 @@ function App() {
   }, [screen]);
 
   function toggleFavorite(product) {
-    const isAlreadySaved = favorites.some((item) => item.barcode === product.barcode);
+    const isAlreadySaved = favorites.some(
+      (item) => item.barcode === product.barcode
+    );
 
     if (isAlreadySaved) {
       setFavorites(favorites.filter((item) => item.barcode !== product.barcode));
@@ -492,7 +611,9 @@ function App() {
 
   function addToComparison(product) {
     setComparisonProducts((previousProducts) => {
-      const alreadyAdded = previousProducts.some((item) => item.barcode === product.barcode);
+      const alreadyAdded = previousProducts.some(
+        (item) => item.barcode === product.barcode
+      );
 
       if (alreadyAdded) {
         return previousProducts;
@@ -517,7 +638,8 @@ function App() {
   }
 
   const isFavorited =
-    currentProduct && favorites.some((item) => item.barcode === currentProduct.barcode);
+    currentProduct &&
+    favorites.some((item) => item.barcode === currentProduct.barcode);
 
   if (screen === "home") {
     return (
@@ -538,6 +660,7 @@ function App() {
             <button
               onClick={() => {
                 setError("");
+                setSearchBarcode("");
                 setScreen("scanner");
               }}
               className="flex w-full transform items-center justify-center gap-3 rounded-xl bg-emerald-600 py-4 text-lg font-bold text-white shadow-lg transition hover:scale-105 hover:bg-emerald-700"
@@ -549,6 +672,7 @@ function App() {
             <button
               onClick={() => {
                 setError("");
+                setSearchBarcode("");
                 setScreen("search");
               }}
               className="flex w-full items-center justify-center gap-3 rounded-xl border-2 border-emerald-600 bg-white py-4 text-lg font-bold text-emerald-600 hover:bg-emerald-50"
@@ -578,7 +702,9 @@ function App() {
 
           {products.length > 0 && (
             <div className="mb-8">
-              <h2 className="mb-3 text-lg font-bold text-gray-900">Recently Scanned</h2>
+              <h2 className="mb-3 text-lg font-bold text-gray-900">
+                Recently Scanned
+              </h2>
 
               <div className="space-y-3">
                 {products.slice(0, 3).map((product) => {
@@ -597,7 +723,7 @@ function App() {
                         <img
                           src={product.image_url}
                           alt={getProductName(product)}
-                          className="h-14 w-14 rounded object-cover"
+                          className="h-14 w-14 rounded object-contain bg-white"
                         />
                       ) : (
                         <div className="flex h-14 w-14 items-center justify-center rounded bg-emerald-100 text-2xl">
@@ -609,7 +735,9 @@ function App() {
                         <p className="line-clamp-1 font-semibold text-gray-900">
                           {getProductName(product)}
                         </p>
-                        <p className="text-sm text-gray-500">{getProductBrand(product)}</p>
+                        <p className="text-sm text-gray-500">
+                          {getProductBrand(product)}
+                        </p>
                       </div>
 
                       <div
@@ -631,7 +759,9 @@ function App() {
               className="rounded-xl bg-white p-4 text-center shadow"
             >
               <p className="mb-1 text-2xl">📋</p>
-              <p className="text-xs font-bold text-gray-700">{products.length} Scans</p>
+              <p className="text-xs font-bold text-gray-700">
+                {products.length} Scans
+              </p>
             </button>
 
             <button
@@ -639,7 +769,9 @@ function App() {
               className="rounded-xl bg-white p-4 text-center shadow"
             >
               <p className="mb-1 text-2xl">❤️</p>
-              <p className="text-xs font-bold text-gray-700">{favorites.length} Fav</p>
+              <p className="text-xs font-bold text-gray-700">
+                {favorites.length} Fav
+              </p>
             </button>
 
             <button
@@ -691,18 +823,28 @@ function App() {
               event.preventDefault();
               fetchProduct(searchBarcode);
             }}
+            className="space-y-3"
           >
             <input
               type="text"
               inputMode="numeric"
+              enterKeyHint="search"
               placeholder="Or enter barcode..."
               value={searchBarcode}
               onChange={(event) => setSearchBarcode(event.target.value)}
               className="w-full rounded-lg border border-gray-700 bg-gray-800 px-4 py-3 text-white"
             />
+
+            <button
+              type="submit"
+              disabled={loading || !searchBarcode.trim()}
+              className="w-full rounded-lg bg-emerald-600 py-3 font-bold text-white disabled:bg-gray-700 disabled:text-gray-400"
+            >
+              {loading ? "Searching..." : "Search Barcode"}
+            </button>
           </form>
 
-          <div className="grid grid-cols-3 gap-2">
+          <div className="grid grid-cols-2 gap-2">
             {DEMO_BARCODES.map((item) => (
               <button
                 key={item.barcode}
@@ -713,12 +855,6 @@ function App() {
               </button>
             ))}
           </div>
-
-          {loading && (
-            <div className="rounded-lg bg-emerald-900/60 p-3 text-center text-sm font-semibold text-emerald-100">
-              Searching product...
-            </div>
-          )}
 
           {error && (
             <div className="rounded-lg bg-red-900/60 p-3 text-center text-sm font-semibold text-red-100">
@@ -749,7 +885,9 @@ function App() {
             Back
           </button>
 
-          <h1 className="mb-6 text-3xl font-bold text-gray-900">Search Product</h1>
+          <h1 className="mb-6 text-3xl font-bold text-gray-900">
+            Search Product
+          </h1>
 
           <form
             onSubmit={(event) => {
@@ -761,6 +899,7 @@ function App() {
             <input
               type="text"
               inputMode="numeric"
+              enterKeyHint="search"
               placeholder="Enter barcode..."
               value={searchBarcode}
               onChange={(event) => setSearchBarcode(event.target.value)}
@@ -769,15 +908,18 @@ function App() {
 
             <button
               type="submit"
-              disabled={loading}
-              className="w-full rounded-xl bg-emerald-600 py-3 font-bold text-white disabled:opacity-60"
+              disabled={loading || !searchBarcode.trim()}
+              className="w-full rounded-xl bg-emerald-600 py-3 font-bold text-white disabled:bg-gray-300 disabled:text-gray-500"
             >
-              {loading ? "Searching..." : "Search"}
+              {loading ? "Searching..." : "Search Barcode"}
             </button>
           </form>
 
           <div className="mb-6 rounded-xl bg-white p-4 shadow">
-            <h2 className="mb-3 font-bold text-gray-900">Try a demo barcode</h2>
+            <h2 className="mb-3 font-bold text-gray-900">
+              Try a demo barcode
+            </h2>
+
             <div className="space-y-2">
               {DEMO_BARCODES.map((item) => (
                 <button
@@ -785,8 +927,12 @@ function App() {
                   onClick={() => fetchProduct(item.barcode)}
                   className="flex w-full items-center justify-between rounded-lg bg-emerald-50 px-4 py-3 text-left"
                 >
-                  <span className="font-semibold text-emerald-900">{item.name}</span>
-                  <span className="text-sm text-emerald-700">{item.barcode}</span>
+                  <span className="font-semibold text-emerald-900">
+                    {item.name}
+                  </span>
+                  <span className="text-sm text-emerald-700">
+                    {item.barcode}
+                  </span>
                 </button>
               ))}
             </div>
@@ -817,11 +963,11 @@ function App() {
           </button>
 
           {currentProduct.image_url ? (
-            <div className="mb-6 overflow-hidden rounded-2xl shadow-lg">
+            <div className="mb-6 overflow-hidden rounded-2xl bg-white shadow-lg">
               <img
                 src={currentProduct.image_url}
                 alt={getProductName(currentProduct)}
-                className="h-64 w-full object-contain bg-white"
+                className="h-64 w-full object-contain"
               />
             </div>
           ) : (
@@ -831,7 +977,9 @@ function App() {
           )}
 
           <div className="mb-6">
-            <p className="mb-1 text-sm text-gray-500">{getProductBrand(currentProduct)}</p>
+            <p className="mb-1 text-sm text-gray-500">
+              {getProductBrand(currentProduct)}
+            </p>
             <h1 className="text-2xl font-bold text-gray-900">
               {getProductName(currentProduct)}
             </h1>
@@ -841,7 +989,10 @@ function App() {
             <div className="mb-6 rounded-xl border-2 border-red-300 bg-red-50 p-4">
               <p className="mb-2 font-bold text-red-700">⚠️ Your Alerts</p>
               {currentProduct.userAlerts.map((alert, index) => (
-                <p key={`${alert.message}-${index}`} className="text-sm text-red-700">
+                <p
+                  key={`${alert.message}-${index}`}
+                  className="text-sm text-red-700"
+                >
                   • {alert.message}
                 </p>
               ))}
@@ -869,8 +1020,8 @@ function App() {
             <h3 className="mb-2 font-bold text-gray-900">Why this score?</h3>
             <p className="text-sm leading-6 text-gray-700">
               Pinch calculates this using nutrition quality, additive risk, and
-              organic or quality labels where available. The score is based only on
-              available product data.
+              organic or quality labels where available. The score is based only
+              on available product data.
             </p>
 
             {currentProduct.productKind === "food" && (
@@ -903,7 +1054,10 @@ function App() {
             <div className="mb-4 rounded-xl border border-amber-300 bg-amber-50 p-4">
               <h3 className="mb-2 font-bold text-amber-900">⚠️ Concerns</h3>
               {currentProduct.details.warnings.map((warning, index) => (
-                <p key={`${warning}-${index}`} className="text-sm text-amber-800">
+                <p
+                  key={`${warning}-${index}`}
+                  className="text-sm text-amber-800"
+                >
                   • {warning}
                 </p>
               ))}
@@ -914,7 +1068,10 @@ function App() {
             <div className="mb-4 rounded-xl border border-green-300 bg-green-50 p-4">
               <h3 className="mb-2 font-bold text-green-900">✓ Positives</h3>
               {currentProduct.details.positives.map((positive, index) => (
-                <p key={`${positive}-${index}`} className="text-sm text-green-800">
+                <p
+                  key={`${positive}-${index}`}
+                  className="text-sm text-green-800"
+                >
                   • {positive}
                 </p>
               ))}
@@ -931,7 +1088,9 @@ function App() {
                     : "border border-gray-300 bg-white text-gray-700"
                 }`}
               >
-                <Heart className={`h-5 w-5 ${isFavorited ? "fill-current" : ""}`} />
+                <Heart
+                  className={`h-5 w-5 ${isFavorited ? "fill-current" : ""}`}
+                />
                 {isFavorited ? "Saved" : "Save"}
               </button>
 
@@ -973,7 +1132,9 @@ function App() {
             Back
           </button>
 
-          <h1 className="mb-6 text-2xl font-bold text-gray-900">Full Details</h1>
+          <h1 className="mb-6 text-2xl font-bold text-gray-900">
+            Full Details
+          </h1>
 
           <div className="mb-4 rounded-xl bg-white p-5 shadow">
             <h3 className="mb-4 font-bold text-gray-900">Nutrition per 100g</h3>
@@ -1005,12 +1166,20 @@ function App() {
               />
               <DetailMetric
                 label="Fibre"
-                value={`${Number(nutriments.fiber_100g || nutriments.fibre_100g || 0).toFixed(1)}g`}
+                value={`${Number(
+                  nutriments.fiber_100g ||
+                    nutriments.fibre_100g ||
+                    0
+                ).toFixed(1)}g`}
                 tone="green"
               />
               <DetailMetric
                 label="Protein"
-                value={`${Number(nutriments.proteins_100g || nutriments.protein_100g || 0).toFixed(1)}g`}
+                value={`${Number(
+                  nutriments.proteins_100g ||
+                    nutriments.protein_100g ||
+                    0
+                ).toFixed(1)}g`}
                 tone="emerald"
               />
             </div>
@@ -1031,14 +1200,18 @@ function App() {
                         {key.toUpperCase()} {additive ? `· ${additive.name}` : ""}
                       </p>
                       <p className="text-amber-800">
-                        Risk: {additive?.risk || "not classified in prototype database"}
+                        Risk:{" "}
+                        {additive?.risk ||
+                          "not classified in prototype database"}
                       </p>
                     </div>
                   );
                 })}
               </div>
             ) : (
-              <p className="text-sm text-gray-600">No additives listed in available data.</p>
+              <p className="text-sm text-gray-600">
+                No additives listed in available data.
+              </p>
             )}
           </div>
 
@@ -1053,10 +1226,10 @@ function App() {
 
           <div className="mt-6 rounded-xl border border-blue-200 bg-blue-50 p-4">
             <p className="text-xs leading-5 text-blue-700">
-              <strong>Disclaimer:</strong> Pinch provides product information based
-              on available label data and prototype scoring rules. It is not medical
-              advice and does not replace a doctor, dietitian, pharmacist, or the
-              official product label.
+              <strong>Disclaimer:</strong> Pinch provides product information
+              based on available label data and prototype scoring rules. It is
+              not medical advice and does not replace a doctor, dietitian,
+              pharmacist, or the official product label.
             </p>
           </div>
         </div>
@@ -1065,9 +1238,25 @@ function App() {
   }
 
   if (screen === "settings") {
-    const allergens = ["gluten", "peanuts", "milk", "eggs", "fish", "soy", "tree nuts"];
+    const allergens = [
+      "gluten",
+      "peanuts",
+      "milk",
+      "eggs",
+      "fish",
+      "soy",
+      "tree nuts"
+    ];
+
     const dietary = ["vegetarian", "vegan", "kosher", "halal"];
-    const avoidIngredients = ["palm oil", "artificial sweeteners", "GMO", "parfum", "BHT"];
+
+    const avoidIngredients = [
+      "palm oil",
+      "artificial sweeteners",
+      "GMO",
+      "parfum",
+      "BHT"
+    ];
 
     return (
       <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-white to-blue-50">
@@ -1080,13 +1269,17 @@ function App() {
             Back
           </button>
 
-          <h1 className="mb-6 text-3xl font-bold text-gray-900">Settings & Alerts</h1>
+          <h1 className="mb-6 text-3xl font-bold text-gray-900">
+            Settings & Alerts
+          </h1>
 
           <div className="mb-6 rounded-2xl bg-gradient-to-br from-amber-400 to-orange-400 p-6 text-white shadow-lg">
             <div className="flex items-start justify-between">
               <div>
                 <h3 className="mb-2 text-xl font-bold">Go Premium</h3>
-                <p className="text-sm">Offline mode · Export data · Family profiles</p>
+                <p className="text-sm">
+                  Offline mode · Export data · Family profiles
+                </p>
               </div>
               <Lock className="h-8 w-8" />
             </div>
@@ -1152,7 +1345,10 @@ function App() {
 
   if (screen === "comparison") {
     const bestProduct = comparisonProducts.reduce((best, product) => {
-      if (!best) return product;
+      if (!best) {
+        return product;
+      }
+
       return product.score > best.score ? product : best;
     }, null);
 
@@ -1167,8 +1363,12 @@ function App() {
             Back
           </button>
 
-          <h1 className="mb-2 text-3xl font-bold text-gray-900">Compare Products</h1>
-          <p className="mb-6 text-gray-600">Add up to 3 products from the result screen.</p>
+          <h1 className="mb-2 text-3xl font-bold text-gray-900">
+            Compare Products
+          </h1>
+          <p className="mb-6 text-gray-600">
+            Add up to 3 products from the result screen.
+          </p>
 
           {comparisonProducts.length === 0 ? (
             <div className="rounded-xl bg-white py-12 text-center shadow">
@@ -1184,9 +1384,12 @@ function App() {
             <>
               {bestProduct && (
                 <div className="mb-4 rounded-xl border border-emerald-300 bg-emerald-50 p-4">
-                  <p className="font-bold text-emerald-900">Best choice so far</p>
+                  <p className="font-bold text-emerald-900">
+                    Best choice so far
+                  </p>
                   <p className="text-sm text-emerald-800">
-                    {getProductName(bestProduct)} has the highest score in this comparison.
+                    {getProductName(bestProduct)} has the highest score in this
+                    comparison.
                   </p>
                 </div>
               )}
@@ -1209,7 +1412,9 @@ function App() {
                         </div>
                       )}
 
-                      <p className="mb-2 text-xs text-gray-500">{getProductBrand(product)}</p>
+                      <p className="mb-2 text-xs text-gray-500">
+                        {getProductBrand(product)}
+                      </p>
                       <p className="mb-3 line-clamp-2 text-sm font-semibold text-gray-900">
                         {getProductName(product)}
                       </p>
@@ -1224,7 +1429,9 @@ function App() {
                       <button
                         onClick={() =>
                           setComparisonProducts((previous) =>
-                            previous.filter((item) => item.barcode !== product.barcode)
+                            previous.filter(
+                              (item) => item.barcode !== product.barcode
+                            )
                           )
                         }
                         className="mt-3 w-full rounded-lg bg-gray-100 py-2 text-sm font-semibold text-gray-700"
@@ -1356,5 +1563,3 @@ function ProductListScreen({ title, emptyText, products, onBack, onSelect }) {
     </div>
   );
 }
-
-export default App;
