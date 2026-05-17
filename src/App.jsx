@@ -6,6 +6,7 @@ import {
   Camera,
   Heart,
   Lock,
+  RefreshCcw,
   Scale,
   Search
 } from "lucide-react";
@@ -409,6 +410,8 @@ export default function App() {
   const [searchBarcode, setSearchBarcode] = useState("");
   const [loading, setLoading] = useState(false);
   const [cameraActive, setCameraActive] = useState(false);
+  const [scannerStatus, setScannerStatus] = useState("Idle");
+  const [scannerRestartKey, setScannerRestartKey] = useState(0);
   const [error, setError] = useState("");
   const [userPreferences, setUserPreferences] = useState({
     allergens: ["gluten", "peanuts", "milk"],
@@ -456,6 +459,7 @@ export default function App() {
 
     setLoading(true);
     setError("");
+    setScannerStatus(`Searching ${cleanBarcode}...`);
 
     try {
       const response = await fetch(
@@ -513,6 +517,7 @@ export default function App() {
       setScreen("result");
     } catch {
       setError("Product not found. Check the barcode and try again.");
+      setScannerStatus("Product not found");
     } finally {
       setLoading(false);
       scanLockRef.current = false;
@@ -530,6 +535,7 @@ export default function App() {
     async function startScanner() {
       setError("");
       setCameraActive(false);
+      setScannerStatus("Opening camera...");
       scanLockRef.current = false;
 
       try {
@@ -537,18 +543,40 @@ export default function App() {
           setError(
             "Camera is not available in this browser. Use manual barcode entry."
           );
+          setScannerStatus("Manual entry only");
           return;
         }
 
         if (!videoRef.current) {
           setError("Camera preview is not ready. Use manual barcode entry.");
+          setScannerStatus("Manual entry only");
           return;
         }
 
         const codeReader = new BrowserMultiFormatReader();
 
+        let selectedDeviceId;
+
+        try {
+          const devices = await BrowserMultiFormatReader.listVideoInputDevices();
+          const backCamera =
+            devices.find((device) =>
+              String(device.label || "").toLowerCase().includes("back")
+            ) ||
+            devices.find((device) =>
+              String(device.label || "").toLowerCase().includes("rear")
+            ) ||
+            devices[devices.length - 1];
+
+          selectedDeviceId = backCamera?.deviceId;
+        } catch {
+          selectedDeviceId = undefined;
+        }
+
+        setScannerStatus("Scanning... hold barcode steady");
+
         controls = await codeReader.decodeFromVideoDevice(
-          undefined,
+          selectedDeviceId,
           videoRef.current,
           (result, scanError, scannerControls) => {
             if (cancelled || scanLockRef.current) {
@@ -560,6 +588,7 @@ export default function App() {
 
               if (barcode) {
                 scanLockRef.current = true;
+                setScannerStatus(`Barcode found: ${barcode}`);
 
                 if (scannerControls) {
                   scannerControls.stop();
@@ -576,6 +605,7 @@ export default function App() {
         }
       } catch {
         setError("Scanner could not start. Use manual barcode entry instead.");
+        setScannerStatus("Manual entry only");
       }
     }
 
@@ -595,7 +625,7 @@ export default function App() {
 
       setCameraActive(false);
     };
-  }, [screen]);
+  }, [screen, scannerRestartKey]);
 
   function toggleFavorite(product) {
     const isAlreadySaved = favorites.some(
@@ -806,14 +836,13 @@ export default function App() {
 
           <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
             <div className="h-48 w-64 rounded-lg border-4 border-emerald-400 opacity-70" />
-            <div className="absolute bottom-8 text-center text-white">
-              <p className="font-semibold">
-                {cameraActive ? "Point at barcode" : "Opening camera..."}
-              </p>
-              <p className="text-sm text-white/70">
-                Manual entry works if scanning is not supported.
-              </p>
-            </div>
+          </div>
+
+          <div className="absolute left-4 right-4 bottom-4 rounded-xl bg-black/70 p-3 text-center text-white">
+            <p className="font-bold">
+              {cameraActive ? "Point at barcode" : "Opening camera..."}
+            </p>
+            <p className="text-sm text-white/80">{scannerStatus}</p>
           </div>
         </div>
 
@@ -843,6 +872,14 @@ export default function App() {
               {loading ? "Searching..." : "Search Barcode"}
             </button>
           </form>
+
+          <button
+            onClick={() => setScannerRestartKey((key) => key + 1)}
+            className="flex w-full items-center justify-center gap-2 rounded-lg bg-blue-600 py-3 font-bold text-white"
+          >
+            <RefreshCcw className="h-5 w-5" />
+            Restart Camera Scanner
+          </button>
 
           <div className="grid grid-cols-2 gap-2">
             {DEMO_BARCODES.map((item) => (
@@ -1399,7 +1436,10 @@ export default function App() {
                   const scoreInfo = getScoreInfo(product.score);
 
                   return (
-                    <div key={product.barcode} className="rounded-xl bg-white p-4 shadow">
+                    <div
+                      key={product.barcode}
+                      className="rounded-xl bg-white p-4 shadow"
+                    >
                       {product.image_url ? (
                         <img
                           src={product.image_url}
@@ -1463,7 +1503,9 @@ function DetailMetric({ label, value, tone }) {
   };
 
   return (
-    <div className={`rounded-lg p-3 ${toneMap[tone] || "bg-gray-50 text-gray-700"}`}>
+    <div
+      className={`rounded-lg p-3 ${toneMap[tone] || "bg-gray-50 text-gray-700"}`}
+    >
       <p className="text-xs text-gray-600">{label}</p>
       <p className="font-bold">{value}</p>
     </div>
