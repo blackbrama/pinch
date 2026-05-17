@@ -69,24 +69,402 @@ const ADDITIVE_DATABASE = {
   }
 };
 
-const DEMO_BARCODES = [
+const DEMO_PRODUCTS = [
   {
     name: "Nutella",
-    barcode: "3017620422003"
+    category: "Sweet spreads",
+    barcode: "3017620422003",
+    fallback: {
+      product_name: "Nutella Hazelnut Cocoa Spread",
+      brands: "Ferrero",
+      categories: "Sweet spreads",
+      ingredients_text: "Sugar, palm oil, hazelnuts, milk powder, cocoa, lecithins, vanillin",
+      additives_tags: ["en:e322"],
+      labels_tags: [],
+      nutriments: {
+        "energy-kcal_100g": 539,
+        sugars_100g: 56.3,
+        "saturated-fat_100g": 10.6,
+        salt_100g: 0.107,
+        proteins_100g: 6.3,
+        fiber_100g: 0
+      },
+      image_emoji: "🍫"
+    }
   },
   {
     name: "Coca-Cola",
-    barcode: "5449000000996"
+    category: "Soft drinks",
+    barcode: "5449000000996",
+    fallback: {
+      product_name: "Coca-Cola Original Taste",
+      brands: "Coca-Cola",
+      categories: "Soft drinks",
+      ingredients_text: "Carbonated water, sugar, colour caramel E150d, phosphoric acid, natural flavourings, caffeine",
+      additives_tags: ["en:e150d"],
+      labels_tags: [],
+      nutriments: {
+        "energy-kcal_100g": 42,
+        sugars_100g: 10.6,
+        "saturated-fat_100g": 0,
+        salt_100g: 0,
+        proteins_100g: 0,
+        fiber_100g: 0
+      },
+      image_emoji: "🥤"
+    }
   },
   {
     name: "Kinder Bueno",
-    barcode: "8000500037560"
+    category: "Chocolate",
+    barcode: "8000500037560",
+    fallback: {
+      product_name: "Kinder Bueno",
+      brands: "Ferrero",
+      categories: "Chocolate bar",
+      ingredients_text: "Milk chocolate, sugar, palm oil, wheat flour, hazelnuts, skimmed milk powder, cocoa, soy lecithin",
+      additives_tags: ["en:e322"],
+      labels_tags: [],
+      nutriments: {
+        "energy-kcal_100g": 572,
+        sugars_100g: 41.2,
+        "saturated-fat_100g": 17.3,
+        salt_100g: 0.272,
+        proteins_100g: 8.6,
+        fiber_100g: 2.2
+      },
+      image_emoji: "🍫"
+    }
   },
   {
-    name: "Greek yogurt",
-    barcode: "5201083348903"
+    name: "Greek Yogurt",
+    category: "Dairy",
+    barcode: "5201083348903",
+    fallback: {
+      product_name: "Greek Style Yogurt",
+      brands: "MEVGAL",
+      categories: "Dairy, Yogurt",
+      ingredients_text: "Milk, yogurt cultures",
+      additives_tags: [],
+      labels_tags: [],
+      nutriments: {
+        "energy-kcal_100g": 97,
+        sugars_100g: 3.8,
+        "saturated-fat_100g": 4.2,
+        salt_100g: 0.1,
+        proteins_100g: 7.5,
+        fiber_100g: 0
+      },
+      image_emoji: "🥣"
+    }
+  },
+  {
+    name: "Barilla Pasta",
+    category: "Pasta",
+    barcode: "8076800195057",
+    fallback: {
+      product_name: "Barilla Spaghetti",
+      brands: "Barilla",
+      categories: "Pasta",
+      ingredients_text: "Durum wheat semolina, water",
+      additives_tags: [],
+      labels_tags: [],
+      nutriments: {
+        "energy-kcal_100g": 359,
+        sugars_100g: 3.5,
+        "saturated-fat_100g": 0.5,
+        salt_100g: 0.013,
+        proteins_100g: 12,
+        fiber_100g: 3
+      },
+      image_emoji: "🍝"
+    }
+  },
+  {
+    name: "Oreo",
+    category: "Biscuits",
+    barcode: "7622210449283",
+    fallback: {
+      product_name: "Oreo Original Biscuits",
+      brands: "Oreo",
+      categories: "Biscuits, Snacks",
+      ingredients_text: "Wheat flour, sugar, palm oil, cocoa powder, glucose-fructose syrup, raising agents, salt, emulsifier soy lecithin",
+      additives_tags: ["en:e322", "en:e500"],
+      labels_tags: [],
+      nutriments: {
+        "energy-kcal_100g": 480,
+        sugars_100g: 38,
+        "saturated-fat_100g": 5.2,
+        salt_100g: 0.73,
+        proteins_100g: 5,
+        fiber_100g: 2.4
+      },
+      image_emoji: "🍪"
+    }
+  },
+  {
+    name: "Pringles",
+    category: "Crisps",
+    barcode: "5053990155358",
+    fallback: {
+      product_name: "Pringles Original",
+      brands: "Pringles",
+      categories: "Crisps, Snacks",
+      ingredients_text: "Dehydrated potatoes, vegetable oils, rice flour, wheat starch, corn flour, emulsifier E471, salt",
+      additives_tags: ["en:e471"],
+      labels_tags: [],
+      nutriments: {
+        "energy-kcal_100g": 536,
+        sugars_100g: 2,
+        "saturated-fat_100g": 3.1,
+        salt_100g: 1.3,
+        proteins_100g: 4,
+        fiber_100g: 3.4
+      },
+      image_emoji: "🥔"
+    }
+  },
+  {
+    name: "Red Bull",
+    category: "Energy drink",
+    barcode: "9002490100070",
+    fallback: {
+      product_name: "Red Bull Energy Drink",
+      brands: "Red Bull",
+      categories: "Energy drinks",
+      ingredients_text: "Carbonated water, sugar, glucose, citric acid, taurine, sodium bicarbonate, caffeine, vitamins, colours",
+      additives_tags: ["en:e150d"],
+      labels_tags: [],
+      nutriments: {
+        "energy-kcal_100g": 45,
+        sugars_100g: 11,
+        "saturated-fat_100g": 0,
+        salt_100g: 0.1,
+        proteins_100g: 0,
+        fiber_100g: 0
+      },
+      image_emoji: "⚡"
+    }
+  },
+  {
+    name: "Evian",
+    category: "Water",
+    barcode: "3068320114453",
+    fallback: {
+      product_name: "Evian Natural Mineral Water",
+      brands: "Evian",
+      categories: "Water",
+      ingredients_text: "Natural mineral water",
+      additives_tags: [],
+      labels_tags: [],
+      nutriments: {
+        "energy-kcal_100g": 0,
+        sugars_100g: 0,
+        "saturated-fat_100g": 0,
+        salt_100g: 0,
+        proteins_100g: 0,
+        fiber_100g: 0
+      },
+      image_emoji: "💧"
+    }
+  },
+  {
+    name: "Heinz Beans",
+    category: "Tinned food",
+    barcode: "5000157074613",
+    fallback: {
+      product_name: "Heinz Baked Beans",
+      brands: "Heinz",
+      categories: "Beans, Tinned food",
+      ingredients_text: "Beans, tomatoes, water, sugar, spirit vinegar, modified cornflour, salt, spice extracts, herb extract",
+      additives_tags: [],
+      labels_tags: [],
+      nutriments: {
+        "energy-kcal_100g": 78,
+        sugars_100g: 4.8,
+        "saturated-fat_100g": 0.1,
+        salt_100g: 0.6,
+        proteins_100g: 4.7,
+        fiber_100g: 3.7
+      },
+      image_emoji: "🫘"
+    }
+  },
+  {
+    name: "Corn Flakes",
+    category: "Breakfast",
+    barcode: "5053827207460",
+    fallback: {
+      product_name: "Corn Flakes",
+      brands: "Kellogg's",
+      categories: "Breakfast cereal",
+      ingredients_text: "Maize, sugar, barley malt extract, salt, vitamins and minerals",
+      additives_tags: [],
+      labels_tags: [],
+      nutriments: {
+        "energy-kcal_100g": 378,
+        sugars_100g: 8,
+        "saturated-fat_100g": 0.2,
+        salt_100g: 1.1,
+        proteins_100g: 7,
+        fiber_100g: 3
+      },
+      image_emoji: "🥣"
+    }
+  },
+  {
+    name: "Almond Milk",
+    category: "Plant milk",
+    barcode: "8428532230102",
+    fallback: {
+      product_name: "Unsweetened Almond Drink",
+      brands: "Alpro",
+      categories: "Plant-based drink",
+      ingredients_text: "Water, almonds, calcium, sea salt, stabilisers, vitamins",
+      additives_tags: ["en:e418"],
+      labels_tags: ["en:vegan"],
+      nutriments: {
+        "energy-kcal_100g": 13,
+        sugars_100g: 0,
+        "saturated-fat_100g": 0.1,
+        salt_100g: 0.13,
+        proteins_100g: 0.4,
+        fiber_100g: 0.2
+      },
+      image_emoji: "🥛"
+    }
+  },
+  {
+    name: "Ryvita",
+    category: "Crackers",
+    barcode: "5000168001189",
+    fallback: {
+      product_name: "Ryvita Original Rye Crispbread",
+      brands: "Ryvita",
+      categories: "Crackers, Crispbread",
+      ingredients_text: "Wholegrain rye flour, rye flour, salt",
+      additives_tags: [],
+      labels_tags: [],
+      nutriments: {
+        "energy-kcal_100g": 342,
+        sugars_100g: 2.5,
+        "saturated-fat_100g": 0.2,
+        salt_100g: 0.9,
+        proteins_100g: 8.5,
+        fiber_100g: 15.2
+      },
+      image_emoji: "🍘"
+    }
+  },
+  {
+    name: "Rice Cakes",
+    category: "Snacks",
+    barcode: "5411188123457",
+    fallback: {
+      product_name: "Plain Rice Cakes",
+      brands: "Demo Pantry",
+      categories: "Rice cakes, Snacks",
+      ingredients_text: "Wholegrain rice, salt",
+      additives_tags: [],
+      labels_tags: [],
+      nutriments: {
+        "energy-kcal_100g": 387,
+        sugars_100g: 0.5,
+        "saturated-fat_100g": 0.4,
+        salt_100g: 0.3,
+        proteins_100g: 8,
+        fiber_100g: 3.5
+      },
+      image_emoji: "🍚"
+    }
+  },
+  {
+    name: "Chicken Breast",
+    category: "Protein",
+    barcode: "2034567890123",
+    fallback: {
+      product_name: "Fresh Chicken Breast",
+      brands: "Demo Fresh",
+      categories: "Meat, Poultry",
+      ingredients_text: "Chicken breast",
+      additives_tags: [],
+      labels_tags: [],
+      nutriments: {
+        "energy-kcal_100g": 110,
+        sugars_100g: 0,
+        "saturated-fat_100g": 0.6,
+        salt_100g: 0.1,
+        proteins_100g: 24,
+        fiber_100g: 0
+      },
+      image_emoji: "🍗"
+    }
+  },
+  {
+    name: "Protein Bar",
+    category: "Fitness",
+    barcode: "5060123450012",
+    fallback: {
+      product_name: "Chocolate Protein Bar",
+      brands: "Demo Sports",
+      categories: "Protein bar",
+      ingredients_text: "Milk protein, cocoa, sweetener, soy protein, palm oil, emulsifier",
+      additives_tags: ["en:e322"],
+      labels_tags: [],
+      nutriments: {
+        "energy-kcal_100g": 390,
+        sugars_100g: 3,
+        "saturated-fat_100g": 5,
+        salt_100g: 0.8,
+        proteins_100g: 32,
+        fiber_100g: 7
+      },
+      image_emoji: "💪"
+    }
+  },
+  {
+    name: "Face Cream",
+    category: "Beauty",
+    barcode: "8433457777000",
+    fallback: {
+      product_name: "Daily Glow Face Cream",
+      brands: "LumaSkin",
+      categories: "Beauty, Cosmetics, Face cream",
+      ingredients_text: "Aqua, glycerin, squalane, parfum, BHT, methylisothiazolinone",
+      additives_tags: [],
+      labels_tags: [],
+      nutriments: {},
+      image_emoji: "🧴"
+    }
+  },
+  {
+    name: "Body Lotion",
+    category: "Personal care",
+    barcode: "5353901234430",
+    fallback: {
+      product_name: "Barrier Calm Body Lotion",
+      brands: "Plain Ritual",
+      categories: "Beauty, Personal care, Body lotion",
+      ingredients_text: "Aqua, glycerin, caprylic triglyceride, ceramide NP, phenoxyethanol",
+      additives_tags: [],
+      labels_tags: [],
+      nutriments: {},
+      image_emoji: "🧼"
+    }
   }
 ];
+
+function normaliseFallbackProduct(item) {
+  return {
+    ...item.fallback,
+    barcode: item.barcode,
+    code: item.barcode,
+    product_name: item.fallback.product_name || item.name,
+    brands: item.fallback.brands || "Demo product",
+    categories: item.fallback.categories || item.category,
+    source: "Demo fallback"
+  };
+}
 
 function normaliseAdditiveTag(tag) {
   return String(tag || "")
@@ -107,6 +485,10 @@ function getProductName(product) {
 
 function getProductBrand(product) {
   return product.brands || "Unknown brand";
+}
+
+function getProductEmoji(product) {
+  return product.image_emoji || "🛒";
 }
 
 function getIngredientText(product) {
@@ -449,7 +831,47 @@ export default function App() {
     return alerts;
   }
 
-  async function fetchProduct(barcode) {
+  async function openProduct(product, barcode) {
+    const categoryText = [
+      product.product_type || "",
+      product.categories || "",
+      ...(product.categories_tags || [])
+    ]
+      .join(" ")
+      .toLowerCase();
+
+    const isCosmetic =
+      categoryText.includes("beauty") ||
+      categoryText.includes("cosmetic") ||
+      categoryText.includes("personal care");
+
+    const scoring = isCosmetic
+      ? calculateCosmeticScore(product)
+      : calculateFoodScore(product);
+
+    const userAlerts = checkUserAlerts(product);
+
+    const productWithScore = {
+      ...product,
+      barcode,
+      score: scoring.score,
+      details: scoring.details,
+      userAlerts,
+      productKind: isCosmetic ? "cosmetic" : "food",
+      scannedAt: new Date().toLocaleDateString()
+    };
+
+    setCurrentProduct(productWithScore);
+
+    setProducts((previousProducts) => [
+      productWithScore,
+      ...previousProducts.filter((item) => item.barcode !== barcode)
+    ]);
+
+    setScreen("result");
+  }
+
+  async function fetchProduct(barcode, fallbackProduct = null) {
     const cleanBarcode = String(barcode || "").trim();
 
     if (!cleanBarcode) {
@@ -476,48 +898,14 @@ export default function App() {
         throw new Error("Product not found");
       }
 
-      const product = data.product;
-
-      const categoryText = [
-        product.product_type || "",
-        product.categories || "",
-        ...(product.categories_tags || [])
-      ]
-        .join(" ")
-        .toLowerCase();
-
-      const isCosmetic =
-        categoryText.includes("beauty") ||
-        categoryText.includes("cosmetic") ||
-        categoryText.includes("personal care");
-
-      const scoring = isCosmetic
-        ? calculateCosmeticScore(product)
-        : calculateFoodScore(product);
-
-      const userAlerts = checkUserAlerts(product);
-
-      const productWithScore = {
-        ...product,
-        barcode: cleanBarcode,
-        score: scoring.score,
-        details: scoring.details,
-        userAlerts,
-        productKind: isCosmetic ? "cosmetic" : "food",
-        scannedAt: new Date().toLocaleDateString()
-      };
-
-      setCurrentProduct(productWithScore);
-
-      setProducts((previousProducts) => [
-        productWithScore,
-        ...previousProducts.filter((item) => item.barcode !== cleanBarcode)
-      ]);
-
-      setScreen("result");
+      await openProduct(data.product, cleanBarcode);
     } catch {
-      setError("Product not found. Check the barcode and try again.");
-      setScannerStatus("Product not found");
+      if (fallbackProduct) {
+        await openProduct(fallbackProduct, cleanBarcode);
+      } else {
+        setError("Product not found. Check the barcode and try again.");
+        setScannerStatus("Product not found");
+      }
     } finally {
       setLoading(false);
       scanLockRef.current = false;
@@ -757,7 +1145,7 @@ export default function App() {
                         />
                       ) : (
                         <div className="flex h-14 w-14 items-center justify-center rounded bg-emerald-100 text-2xl">
-                          🛒
+                          {getProductEmoji(product)}
                         </div>
                       )}
 
@@ -881,16 +1269,25 @@ export default function App() {
             Restart Camera Scanner
           </button>
 
-          <div className="grid grid-cols-2 gap-2">
-            {DEMO_BARCODES.map((item) => (
-              <button
-                key={item.barcode}
-                onClick={() => fetchProduct(item.barcode)}
-                className="rounded-lg bg-gray-800 px-2 py-3 text-xs font-semibold text-white"
-              >
-                {item.name}
-              </button>
-            ))}
+          <div className="max-h-72 overflow-y-auto rounded-xl border border-gray-800 p-2">
+            <p className="mb-2 px-1 text-xs font-bold uppercase tracking-wide text-gray-400">
+              Demo product list
+            </p>
+
+            <div className="grid grid-cols-2 gap-2">
+              {DEMO_PRODUCTS.map((item) => (
+                <button
+                  key={item.barcode}
+                  onClick={() =>
+                    fetchProduct(item.barcode, normaliseFallbackProduct(item))
+                  }
+                  className="rounded-lg bg-gray-800 px-2 py-3 text-left text-xs font-semibold text-white"
+                >
+                  <span className="block text-sm">{item.name}</span>
+                  <span className="block text-gray-400">{item.category}</span>
+                </button>
+              ))}
+            </div>
           </div>
 
           {error && (
@@ -954,21 +1351,23 @@ export default function App() {
 
           <div className="mb-6 rounded-xl bg-white p-4 shadow">
             <h2 className="mb-3 font-bold text-gray-900">
-              Try a demo barcode
+              Try a demo product
             </h2>
 
-            <div className="space-y-2">
-              {DEMO_BARCODES.map((item) => (
+            <div className="grid grid-cols-2 gap-2">
+              {DEMO_PRODUCTS.map((item) => (
                 <button
                   key={item.barcode}
-                  onClick={() => fetchProduct(item.barcode)}
-                  className="flex w-full items-center justify-between rounded-lg bg-emerald-50 px-4 py-3 text-left"
+                  onClick={() =>
+                    fetchProduct(item.barcode, normaliseFallbackProduct(item))
+                  }
+                  className="rounded-lg bg-emerald-50 px-3 py-3 text-left"
                 >
-                  <span className="font-semibold text-emerald-900">
+                  <span className="block text-sm font-bold text-emerald-900">
                     {item.name}
                   </span>
-                  <span className="text-sm text-emerald-700">
-                    {item.barcode}
+                  <span className="block text-xs text-emerald-700">
+                    {item.category}
                   </span>
                 </button>
               ))}
@@ -1008,8 +1407,8 @@ export default function App() {
               />
             </div>
           ) : (
-            <div className="mb-6 flex h-40 items-center justify-center rounded-2xl bg-white text-5xl shadow-lg">
-              🛒
+            <div className="mb-6 flex h-40 items-center justify-center rounded-2xl bg-white text-6xl shadow-lg">
+              {getProductEmoji(currentProduct)}
             </div>
           )}
 
@@ -1020,6 +1419,11 @@ export default function App() {
             <h1 className="text-2xl font-bold text-gray-900">
               {getProductName(currentProduct)}
             </h1>
+            {currentProduct.source === "Demo fallback" && (
+              <p className="mt-2 rounded-full bg-blue-50 px-3 py-1 text-xs font-bold text-blue-700">
+                Demo fallback product
+              </p>
+            )}
           </div>
 
           {currentProduct.userAlerts?.length > 0 && (
@@ -1448,7 +1852,7 @@ export default function App() {
                         />
                       ) : (
                         <div className="mb-3 flex h-24 w-full items-center justify-center rounded bg-emerald-50 text-3xl">
-                          🛒
+                          {getProductEmoji(product)}
                         </div>
                       )}
 
@@ -1577,7 +1981,7 @@ function ProductListScreen({ title, emptyText, products, onBack, onSelect }) {
                     />
                   ) : (
                     <div className="flex h-14 w-14 items-center justify-center rounded bg-emerald-50 text-2xl">
-                      🛒
+                      {getProductEmoji(product)}
                     </div>
                   )}
 
