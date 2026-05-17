@@ -1,740 +1,1230 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { BrowserMultiFormatReader } from "@zxing/browser";
 import {
-  ArrowLeft,
-  Award,
-  Bell,
+  AlertTriangle,
+  Apple,
   Camera,
+  ChevronLeft,
   ChevronRight,
-  Flame,
-  Gift,
+  Clock,
   Heart,
-  History,
   Home,
   Leaf,
-  Lock,
+  RefreshCcw,
+  Search,
+  ShieldCheck,
+  SlidersHorizontal,
   Sparkles,
-  Trash2,
-  TrendingUp,
-  Zap,
-  Map,
-  Star
+  Star,
+  X
 } from "lucide-react";
 
-// Local products database
-const LOCAL_PRODUCTS = {
-  "mt": { // Malta
-    name: "Malta",
-    products: [
-      {
-        barcode: "3017620422003",
-        name: "Nutella",
-        brand: "Ferrero",
-        local: false,
-        emoji: "🍫"
-      },
-      {
-        barcode: "8006205024069",
-        name: "Mellieħa Tomatoes",
-        brand: "Local Farm",
-        local: true,
-        emoji: "🍅",
-        description: "Fresh local tomatoes from Mellieħa"
-      },
-      {
-        barcode: "9999000001",
-        name: "Kinnie",
-        brand: "Malta Beverage",
-        local: true,
-        emoji: "🥤",
-        description: "Traditional Maltese carbonated drink"
-      }
-    ]
+const ADDITIVES = {
+  e102: { name: "Tartrazine", risk: "high", reason: "Colour additive flagged by Pinch." },
+  e110: { name: "Sunset Yellow", risk: "high", reason: "Colour additive flagged by Pinch." },
+  e129: { name: "Allura Red", risk: "high", reason: "Colour additive flagged by Pinch." },
+  e250: { name: "Sodium nitrite", risk: "moderate", reason: "Preservative with usage concerns." },
+  e320: { name: "BHA", risk: "high", reason: "Antioxidant flagged as high concern." },
+  e321: { name: "BHT", risk: "high", reason: "Antioxidant flagged as high concern." },
+  e322: { name: "Lecithins", risk: "low", reason: "Common emulsifier." },
+  e330: { name: "Citric acid", risk: "low", reason: "Common acidity regulator." },
+  e471: { name: "Mono and diglycerides", risk: "moderate", reason: "Texture and emulsifier additive." },
+  e500: { name: "Sodium carbonates", risk: "low", reason: "Common raising agent." },
+  e621: { name: "Monosodium glutamate", risk: "moderate", reason: "Flavour enhancer." }
+};
+
+const DEMO_PRODUCTS = [
+  {
+    barcode: "3017620422003",
+    name: "Nutella Hazelnut Cocoa Spread",
+    shortName: "Nutella",
+    brand: "Ferrero",
+    kind: "food",
+    category: "Sweet spreads",
+    emoji: "🍫",
+    ingredients: "Sugar, palm oil, hazelnuts, milk powder, cocoa, lecithins, vanillin",
+    additives: ["e322"],
+    labels: [],
+    nutrition: { kcal: 539, sugar: 56.3, satFat: 10.6, salt: 0.11, protein: 6.3, fibre: 0 }
+  },
+  {
+    barcode: "5449000000996",
+    name: "Coca-Cola Original Taste",
+    shortName: "Coca-Cola",
+    brand: "Coca-Cola",
+    kind: "food",
+    category: "Soft drinks",
+    emoji: "🥤",
+    ingredients: "Carbonated water, sugar, colour caramel E150d, phosphoric acid, natural flavourings, caffeine",
+    additives: ["e330"],
+    labels: [],
+    nutrition: { kcal: 42, sugar: 10.6, satFat: 0, salt: 0, protein: 0, fibre: 0 }
+  },
+  {
+    barcode: "8000500037560",
+    name: "Kinder Bueno",
+    shortName: "Kinder Bueno",
+    brand: "Ferrero",
+    kind: "food",
+    category: "Chocolate",
+    emoji: "🍫",
+    ingredients: "Milk chocolate, sugar, palm oil, wheat flour, hazelnuts, skimmed milk powder, cocoa, soy lecithin",
+    additives: ["e322"],
+    labels: [],
+    nutrition: { kcal: 572, sugar: 41.2, satFat: 17.3, salt: 0.27, protein: 8.6, fibre: 2.2 }
+  },
+  {
+    barcode: "5201083348903",
+    name: "Greek Style Yogurt",
+    shortName: "Greek Yogurt",
+    brand: "MEVGAL",
+    kind: "food",
+    category: "Dairy",
+    emoji: "🥣",
+    ingredients: "Milk, yogurt cultures",
+    additives: [],
+    labels: [],
+    nutrition: { kcal: 97, sugar: 3.8, satFat: 4.2, salt: 0.1, protein: 7.5, fibre: 0 }
+  },
+  {
+    barcode: "8076800195057",
+    name: "Barilla Spaghetti",
+    shortName: "Barilla Pasta",
+    brand: "Barilla",
+    kind: "food",
+    category: "Pasta",
+    emoji: "🍝",
+    ingredients: "Durum wheat semolina, water",
+    additives: [],
+    labels: [],
+    nutrition: { kcal: 359, sugar: 3.5, satFat: 0.5, salt: 0.01, protein: 12, fibre: 3 }
+  },
+  {
+    barcode: "7622210449283",
+    name: "Oreo Original Biscuits",
+    shortName: "Oreo",
+    brand: "Oreo",
+    kind: "food",
+    category: "Biscuits",
+    emoji: "🍪",
+    ingredients: "Wheat flour, sugar, palm oil, cocoa powder, glucose-fructose syrup, raising agents, salt, soy lecithin",
+    additives: ["e322", "e500"],
+    labels: [],
+    nutrition: { kcal: 480, sugar: 38, satFat: 5.2, salt: 0.73, protein: 5, fibre: 2.4 }
+  },
+  {
+    barcode: "5053990155358",
+    name: "Pringles Original",
+    shortName: "Pringles",
+    brand: "Pringles",
+    kind: "food",
+    category: "Crisps",
+    emoji: "🥔",
+    ingredients: "Dehydrated potatoes, vegetable oils, rice flour, wheat starch, corn flour, emulsifier E471, salt",
+    additives: ["e471"],
+    labels: [],
+    nutrition: { kcal: 536, sugar: 2, satFat: 3.1, salt: 1.3, protein: 4, fibre: 3.4 }
+  },
+  {
+    barcode: "9002490100070",
+    name: "Red Bull Energy Drink",
+    shortName: "Red Bull",
+    brand: "Red Bull",
+    kind: "food",
+    category: "Energy drink",
+    emoji: "⚡",
+    ingredients: "Carbonated water, sugar, glucose, citric acid, taurine, sodium bicarbonate, caffeine, vitamins",
+    additives: ["e330"],
+    labels: [],
+    nutrition: { kcal: 45, sugar: 11, satFat: 0, salt: 0.1, protein: 0, fibre: 0 }
+  },
+  {
+    barcode: "3068320114453",
+    name: "Evian Natural Mineral Water",
+    shortName: "Evian",
+    brand: "Evian",
+    kind: "food",
+    category: "Water",
+    emoji: "💧",
+    ingredients: "Natural mineral water",
+    additives: [],
+    labels: [],
+    nutrition: { kcal: 0, sugar: 0, satFat: 0, salt: 0, protein: 0, fibre: 0 }
+  },
+  {
+    barcode: "5000157074613",
+    name: "Heinz Baked Beans",
+    shortName: "Heinz Beans",
+    brand: "Heinz",
+    kind: "food",
+    category: "Tinned food",
+    emoji: "🫘",
+    ingredients: "Beans, tomatoes, water, sugar, spirit vinegar, modified cornflour, salt, spice extracts",
+    additives: [],
+    labels: [],
+    nutrition: { kcal: 78, sugar: 4.8, satFat: 0.1, salt: 0.6, protein: 4.7, fibre: 3.7 }
+  },
+  {
+    barcode: "5000168001189",
+    name: "Ryvita Original Rye Crispbread",
+    shortName: "Ryvita",
+    brand: "Ryvita",
+    kind: "food",
+    category: "Crackers",
+    emoji: "🍘",
+    ingredients: "Wholegrain rye flour, rye flour, salt",
+    additives: [],
+    labels: [],
+    nutrition: { kcal: 342, sugar: 2.5, satFat: 0.2, salt: 0.9, protein: 8.5, fibre: 15.2 }
+  },
+  {
+    barcode: "8428532230102",
+    name: "Unsweetened Almond Drink",
+    shortName: "Almond Milk",
+    brand: "Alpro",
+    kind: "food",
+    category: "Plant milk",
+    emoji: "🥛",
+    ingredients: "Water, almonds, calcium, sea salt, stabilisers, vitamins",
+    additives: ["e322"],
+    labels: ["vegan"],
+    nutrition: { kcal: 13, sugar: 0, satFat: 0.1, salt: 0.13, protein: 0.4, fibre: 0.2 }
+  },
+  {
+    barcode: "5060123450012",
+    name: "Chocolate Protein Bar",
+    shortName: "Protein Bar",
+    brand: "Demo Sports",
+    kind: "food",
+    category: "Fitness",
+    emoji: "💪",
+    ingredients: "Milk protein, cocoa, sweetener, soy protein, palm oil, emulsifier",
+    additives: ["e322"],
+    labels: [],
+    nutrition: { kcal: 390, sugar: 3, satFat: 5, salt: 0.8, protein: 32, fibre: 7 }
+  },
+  {
+    barcode: "2034567890123",
+    name: "Fresh Chicken Breast",
+    shortName: "Chicken Breast",
+    brand: "Demo Fresh",
+    kind: "food",
+    category: "Protein",
+    emoji: "🍗",
+    ingredients: "Chicken breast",
+    additives: [],
+    labels: [],
+    nutrition: { kcal: 110, sugar: 0, satFat: 0.6, salt: 0.1, protein: 24, fibre: 0 }
+  },
+  {
+    barcode: "8433457777000",
+    name: "Daily Glow Face Cream",
+    shortName: "Face Cream",
+    brand: "LumaSkin",
+    kind: "cosmetic",
+    category: "Beauty",
+    emoji: "🧴",
+    ingredients: "Aqua, glycerin, squalane, parfum, BHT, methylisothiazolinone",
+    additives: [],
+    labels: [],
+    nutrition: {}
+  },
+  {
+    barcode: "5353901234430",
+    name: "Barrier Calm Body Lotion",
+    shortName: "Body Lotion",
+    brand: "Plain Ritual",
+    kind: "cosmetic",
+    category: "Personal care",
+    emoji: "🧼",
+    ingredients: "Aqua, glycerin, caprylic triglyceride, ceramide NP, phenoxyethanol",
+    additives: [],
+    labels: [],
+    nutrition: {}
+  },
+  {
+    barcode: "7350123456789",
+    name: "Fragrance-Free Gentle Cleanser",
+    shortName: "Gentle Cleanser",
+    brand: "Soft Lab",
+    kind: "cosmetic",
+    category: "Skincare",
+    emoji: "🫧",
+    ingredients: "Aqua, glycerin, cocamidopropyl betaine, panthenol, sodium benzoate",
+    additives: [],
+    labels: [],
+    nutrition: {}
   }
-};
+];
 
-const ADDITIVE_DATABASE = {
-  e102: { name: "Tartrazine", risk: "high", concerns: ["allergen", "hyperactivity"] },
-  e110: { name: "Sunset Yellow", risk: "high", concerns: ["allergen", "hyperactivity"] },
-  e129: { name: "Allura Red", risk: "high", concerns: ["allergen", "hyperactivity"] },
-  e250: { name: "Sodium nitrite", risk: "moderate", concerns: ["cancer concern"] },
-  e251: { name: "Sodium nitrate", risk: "moderate", concerns: ["cancer concern"] },
-  e320: { name: "BHA", risk: "high", concerns: ["carcinogenic concern"] },
-  e321: { name: "BHT", risk: "high", concerns: ["carcinogenic concern"] },
-  e621: { name: "Monosodium glutamate", risk: "moderate", concerns: ["sensitivity"] },
-  e627: { name: "Disodium guanylate", risk: "moderate", concerns: ["sensitivity"] },
-  e631: { name: "Disodium inosinate", risk: "moderate", concerns: ["sensitivity"] },
-  e635: { name: "Disodium 5-ribonucleotide", risk: "moderate", concerns: ["sensitivity"] }
-};
-
-// Gamification achievements
-const ACHIEVEMENTS = {
-  firstScan: { id: "firstScan", name: "First Scan", icon: "🎯", points: 10 },
-  healthyStreak: { id: "healthyStreak", name: "Health Warrior", icon: "💪", points: 25, requirement: 5 },
-  localLover: { id: "localLover", name: "Local Lover", icon: "🌍", points: 30 },
-  collectorX10: { id: "collectorX10", name: "Product Collector", icon: "📚", points: 50, requirement: 10 },
-  comparisonMaster: { id: "comparisonMaster", name: "Comparison Master", icon: "⚖️", points: 20 },
-  sevenDayStreak: { id: "sevenDayStreak", name: "Dedicated Scanner", icon: "🔥", points: 100 }
-};
-
-function calculateFoodScore(product) {
-  let score = 100;
-  const nutriments = product.nutriments || {};
-
-  if (nutriments["energy-kcal_100g"] > 500) score -= 8;
-  if (nutriments.sugars_100g > 20) score -= 12;
-  if (nutriments["saturated-fat_100g"] > 6) score -= 8;
-  if (nutriments.salt_100g > 1.5) score -= 10;
-  if (nutriments.fiber_100g > 5) score += 8;
-  if (nutriments.proteins_100g > 12) score += 8;
-
-  if (product.additives_tags?.length > 5) score -= 10;
-
-  return Math.max(0, Math.min(100, score));
+function toProduct(item) {
+  return {
+    code: item.barcode,
+    barcode: item.barcode,
+    product_name: item.name,
+    demo_short_name: item.shortName,
+    brands: item.brand,
+    categories: item.category,
+    product_type: item.kind,
+    ingredients_text: item.ingredients,
+    additives_tags: item.additives.map((code) => `en:${code}`),
+    labels_tags: item.labels.map((label) => `en:${label}`),
+    image_emoji: item.emoji,
+    demo_source: true,
+    nutriments: {
+      "energy-kcal_100g": item.nutrition.kcal,
+      sugars_100g: item.nutrition.sugar,
+      "saturated-fat_100g": item.nutrition.satFat,
+      salt_100g: item.nutrition.salt,
+      proteins_100g: item.nutrition.protein,
+      fiber_100g: item.nutrition.fibre
+    }
+  };
 }
 
-function getScoreColor(score) {
-  if (score >= 80) return { color: "#10b981", label: "Excellent", emoji: "🟢" };
-  if (score >= 60) return { color: "#84cc16", label: "Good", emoji: "🟡" };
-  if (score >= 40) return { color: "#f59e0b", label: "Average", emoji: "🟠" };
-  if (score >= 20) return { color: "#ef4444", label: "Poor", emoji: "🔴" };
-  return { color: "#7c2d12", label: "Very Poor", emoji: "⚫" };
+function normalizeAdditive(tag) {
+  return String(tag || "").toLowerCase().replace("en:", "").replace("additive:", "").trim();
+}
+
+function getName(product) {
+  return product.demo_short_name || product.product_name || product.product_name_en || product.generic_name || "Unknown product";
+}
+
+function getFullName(product) {
+  return product.product_name || product.product_name_en || product.generic_name || "Unknown product";
+}
+
+function getBrand(product) {
+  return product.brands || "Unknown brand";
+}
+
+function getEmoji(product) {
+  return product.image_emoji || "🛒";
+}
+
+function getIngredients(product) {
+  return String(product.ingredients_text || product.ingredients_text_en || "").toLowerCase();
+}
+
+function getKind(product) {
+  const text = [product.product_type || "", product.categories || "", ...(product.categories_tags || [])]
+    .join(" ")
+    .toLowerCase();
+
+  if (["beauty", "cosmetic", "personal care", "skincare", "hygiene"].some((term) => text.includes(term))) {
+    return "cosmetic";
+  }
+
+  return "food";
+}
+
+function getKcal(product) {
+  const n = product.nutriments || {};
+  if (n["energy-kcal_100g"]) return Number(n["energy-kcal_100g"]);
+  if (n.energy_kcal_100g) return Number(n.energy_kcal_100g);
+  if (n.energy_100g) return Number(n.energy_100g) / 4.184;
+  return 0;
+}
+
+function getSugar(product) {
+  return Number(product.nutriments?.sugars_100g || 0);
+}
+
+function getSatFat(product) {
+  return Number(product.nutriments?.["saturated-fat_100g"] || product.nutriments?.saturated_fat_100g || 0);
+}
+
+function getSalt(product) {
+  const n = product.nutriments || {};
+  if (n.salt_100g) return Number(n.salt_100g);
+  if (n.sodium_100g) return Number(n.sodium_100g) * 2.5;
+  return 0;
+}
+
+function getProtein(product) {
+  return Number(product.nutriments?.proteins_100g || product.nutriments?.protein_100g || 0);
+}
+
+function getFibre(product) {
+  return Number(product.nutriments?.fiber_100g || product.nutriments?.fibre_100g || 0);
+}
+
+function scoreFood(product) {
+  let nutrition = 60;
+  let additives = 30;
+  let organic = 0;
+  let cap = 100;
+
+  const warnings = [];
+  const positives = [];
+
+  const kcal = getKcal(product);
+  const sugar = getSugar(product);
+  const satFat = getSatFat(product);
+  const salt = getSalt(product);
+  const protein = getProtein(product);
+  const fibre = getFibre(product);
+
+  if (kcal > 500) {
+    nutrition -= 8;
+    warnings.push("Very high calories");
+  } else if (kcal > 350) {
+    nutrition -= 5;
+  }
+
+  if (sugar > 20) {
+    nutrition -= 12;
+    warnings.push("Very high sugar");
+  } else if (sugar > 12) {
+    nutrition -= 8;
+    warnings.push("High sugar");
+  } else if (sugar <= 3) {
+    positives.push("Low sugar");
+  }
+
+  if (satFat > 6) {
+    nutrition -= 8;
+    warnings.push("Very high saturated fat");
+  } else if (satFat > 3) {
+    nutrition -= 5;
+    warnings.push("High saturated fat");
+  }
+
+  if (salt > 1.5) {
+    nutrition -= 10;
+    warnings.push("Very high salt");
+  } else if (salt > 1) {
+    nutrition -= 6;
+    warnings.push("High salt");
+  }
+
+  if (fibre > 5) {
+    nutrition += 8;
+    positives.push("Excellent fibre");
+  } else if (fibre > 3) {
+    nutrition += 5;
+    positives.push("Good fibre");
+  }
+
+  if (protein > 12) {
+    nutrition += 8;
+    positives.push("Excellent protein");
+  } else if (protein > 6) {
+    nutrition += 5;
+    positives.push("Good protein");
+  }
+
+  const additiveTags = product.additives_tags || [];
+
+  if (additiveTags.length === 0) {
+    positives.push("No additives listed");
+  }
+
+  additiveTags.forEach((tag) => {
+    const key = normalizeAdditive(tag);
+    const additive = ADDITIVES[key];
+
+    if (!additive) {
+      additives -= 3;
+      warnings.push(`Unclassified additive: ${key.toUpperCase()}`);
+      return;
+    }
+
+    if (additive.risk === "high") {
+      cap = Math.min(cap, 49);
+      additives -= 15;
+      warnings.push(`High-risk additive: ${additive.name}`);
+    }
+
+    if (additive.risk === "moderate") {
+      additives -= 8;
+      warnings.push(`Moderate-risk additive: ${additive.name}`);
+    }
+
+    if (additive.risk === "low") {
+      additives -= 3;
+    }
+  });
+
+  const labels = [...(product.labels_tags || []), product.labels || ""].join(" ").toLowerCase();
+
+  if (labels.includes("organic")) {
+    organic = 10;
+    positives.push("Certified organic");
+  }
+
+  nutrition = Math.max(0, Math.min(60, nutrition));
+  additives = Math.max(0, Math.min(30, additives));
+
+  const total = Math.min(cap, Math.max(0, Math.min(100, Math.round(nutrition + additives + organic))));
+
+  if (warnings.length === 0) positives.push("No major concerns detected from available data");
+
+  return { score: total, parts: { nutrition: Math.round(nutrition), additives: Math.round(additives), organic }, warnings, positives };
+}
+
+function scoreCosmetic(product) {
+  const ingredients = getIngredients(product);
+  const warnings = [];
+  const positives = [];
+  let score = 90;
+
+  ["bht", "formaldehyde", "triclosan", "phthalate", "paraben"].forEach((term) => {
+    if (ingredients.includes(term)) {
+      score = Math.min(score, 24);
+      warnings.push(`High concern ingredient: ${term}`);
+    }
+  });
+
+  ["parfum", "fragrance", "methylisothiazolinone", "phenoxyethanol"].forEach((term) => {
+    if (ingredients.includes(term)) {
+      score = Math.min(score, 49);
+      warnings.push(`Moderate concern ingredient: ${term}`);
+    }
+  });
+
+  if (warnings.length === 0) positives.push("No high-risk cosmetic ingredients detected");
+
+  return { score, parts: { nutrition: 0, additives: 0, organic: 0 }, warnings, positives };
+}
+
+function scoreProduct(rawProduct, barcodeOverride) {
+  const barcode = barcodeOverride || rawProduct.code || rawProduct.barcode || "unknown";
+  const kind = getKind(rawProduct);
+  const scored = kind === "cosmetic" ? scoreCosmetic(rawProduct) : scoreFood(rawProduct);
+
+  return { ...rawProduct, barcode, productKind: kind, score: scored.score, scoreParts: scored.parts, warnings: scored.warnings, positives: scored.positives, scannedAt: new Date().toLocaleDateString() };
+}
+
+function getScoreMeta(score) {
+  if (score >= 80) return { label: "Excellent", tone: "excellent", color: "#00a66a" };
+  if (score >= 60) return { label: "Good", tone: "good", color: "#7dbb35" };
+  if (score >= 40) return { label: "Average", tone: "average", color: "#f5a623" };
+  if (score >= 20) return { label: "Poor", tone: "poor", color: "#ff6b47" };
+  return { label: "Very Poor", tone: "bad", color: "#d9344a" };
+}
+
+function getRecommendations(product) {
+  const demoProducts = DEMO_PRODUCTS.map(toProduct).map((item) => scoreProduct(item, item.barcode));
+
+  if (!product) return demoProducts.sort((a, b) => b.score - a.score).slice(0, 8);
+
+  const sameKind = demoProducts
+    .filter((item) => item.barcode !== product.barcode)
+    .filter((item) => item.productKind === product.productKind)
+    .filter((item) => item.score > product.score)
+    .sort((a, b) => b.score - a.score);
+
+  const anyBetter = demoProducts
+    .filter((item) => item.barcode !== product.barcode)
+    .filter((item) => item.score > product.score)
+    .sort((a, b) => b.score - a.score);
+
+  return [...sameKind, ...anyBetter]
+    .filter((item, index, array) => array.findIndex((x) => x.barcode === item.barcode) === index)
+    .slice(0, 8);
+}
+
+function findDemo(query) {
+  const q = String(query || "").trim().toLowerCase();
+  if (!q) return null;
+
+  return DEMO_PRODUCTS.find((item) => item.barcode === q || item.name.toLowerCase().includes(q) || item.shortName.toLowerCase().includes(q) || item.brand.toLowerCase().includes(q) || item.category.toLowerCase().includes(q));
+}
+
+function toggleArray(object, key, value) {
+  const exists = object[key].includes(value);
+  return { ...object, [key]: exists ? object[key].filter((item) => item !== value) : [...object[key], value] };
 }
 
 export default function App() {
   const [screen, setScreen] = useState("home");
-  const [products, setProducts] = useState([]);
+  const [query, setQuery] = useState("");
   const [currentProduct, setCurrentProduct] = useState(null);
+  const [history, setHistory] = useState([]);
   const [favorites, setFavorites] = useState([]);
-  const [searchBarcode, setSearchBarcode] = useState("");
+  const [compare, setCompare] = useState([]);
+  const [tab, setTab] = useState("overview");
   const [loading, setLoading] = useState(false);
+  const [scannerStatus, setScannerStatus] = useState("Camera is optional. Manual search is reliable.");
+  const [scannerKey, setScannerKey] = useState(0);
   const [error, setError] = useState("");
-  const [videoActive, setVideoActive] = useState(false);
-  
-  // Gamification state
-  const [stats, setStats] = useState({
-    totalScans: 0,
-    points: 0,
-    streak: 0,
-    lastScanDate: null,
-    achievements: [],
-    topScore: 0
-  });
+  const [preferences, setPreferences] = useState({ avoid: ["palm oil", "parfum", "bht"], allergens: ["milk", "peanuts", "gluten"] });
 
   const videoRef = useRef(null);
-  const canvasRef = useRef(null);
-  const readerRef = useRef(null);
+  const lockRef = useRef(false);
 
-  // Initialize barcode reader
-  useEffect(() => {
-    readerRef.current = new BrowserMultiFormatReader();
-  }, []);
+  const recommendations = useMemo(() => getRecommendations(currentProduct), [currentProduct]);
+  const isFavorite = currentProduct && favorites.some((item) => item.barcode === currentProduct.barcode);
 
-  // Start camera scanning
-  useEffect(() => {
-    if (screen !== "scanner" || !videoActive) return;
+  function enrichAlerts(product) {
+    const ingredients = getIngredients(product);
+    const alerts = [];
 
-    const startScanning = async () => {
-      try {
-        const deviceId = await readerRef.current.getVideoInputDevices().then(devices =>
-          devices[0]?.deviceId
-        );
+    preferences.avoid.forEach((item) => {
+      if (ingredients.includes(item.toLowerCase())) alerts.push(`Contains avoided ingredient: ${item}`);
+    });
 
-        readerRef.current.decodeFromVideoDevice(deviceId, videoRef.current, (result, err) => {
-          if (result) {
-            fetchProduct(result.getText());
-            setVideoActive(false);
-          }
-        });
-      } catch (err) {
-        setError("Camera access denied");
-      }
-    };
+    preferences.allergens.forEach((item) => {
+      if (ingredients.includes(item.toLowerCase())) alerts.push(`Potential allergen: ${item}`);
+    });
 
-    startScanning();
+    return { ...product, alerts };
+  }
 
-    return () => {
-      readerRef.current?.reset();
-    };
-  }, [screen, videoActive]);
+  function openProduct(product) {
+    const enriched = enrichAlerts(product);
+    setCurrentProduct(enriched);
+    setTab("overview");
+    setHistory((prev) => [enriched, ...prev.filter((item) => item.barcode !== enriched.barcode)].slice(0, 30));
+    setScreen("result");
+  }
 
-  const fetchProduct = async (barcode) => {
+  async function searchProduct(input, fallbackItem = null) {
+    const value = String(input || "").trim();
+
+    if (!value) {
+      setError("Enter a barcode or choose a demo product.");
+      return;
+    }
+
     setLoading(true);
     setError("");
 
+    const localMatch = fallbackItem || findDemo(value);
+
+    if (localMatch && !/^\d+$/.test(value)) {
+      openProduct(scoreProduct(toProduct(localMatch), localMatch.barcode));
+      setLoading(false);
+      return;
+    }
+
+    const barcode = localMatch?.barcode || value;
+
     try {
-      const response = await fetch(
-        `https://world.openfoodfacts.org/api/v0/product/${barcode}.json`
-      );
+      const response = await fetch(`https://world.openfoodfacts.org/api/v0/product/${barcode}.json`);
       const data = await response.json();
 
-      if (data.status === 1) {
-        const score = calculateFoodScore(data.product);
-        const productData = { ...data.product, calculatedScore: score, scannedAt: new Date() };
-
-        setCurrentProduct(productData);
-        setProducts([productData, ...products]);
-
-        // Update gamification
-        updateGameification(score);
-        setScreen("result");
+      if (data?.status === 1 && data?.product) {
+        openProduct(scoreProduct(data.product, barcode));
+      } else if (localMatch) {
+        openProduct(scoreProduct(toProduct(localMatch), localMatch.barcode));
       } else {
-        setError("Product not found");
+        throw new Error("Product not found");
       }
-    } catch (err) {
-      setError("Error fetching product");
+    } catch {
+      if (localMatch) {
+        openProduct(scoreProduct(toProduct(localMatch), localMatch.barcode));
+      } else {
+        setError("Product not found. Try one of the demo products below.");
+      }
     } finally {
       setLoading(false);
+      lockRef.current = false;
     }
-  };
+  }
 
-  const updateGameification = (score) => {
-    setStats(prev => {
-      const today = new Date().toDateString();
-      const newStreak = prev.lastScanDate === today ? prev.streak : prev.streak + 1;
-      const points = prev.points + (score >= 60 ? 15 : 5);
-      const achievements = [...prev.achievements];
+  useEffect(() => {
+    if (screen !== "scanner") return undefined;
 
-      // Check achievements
-      if (prev.totalScans === 0) achievements.push("firstScan");
-      if (prev.totalScans + 1 === 10) achievements.push("collectorX10");
-      if (score >= 80 && !achievements.includes("healthyStreak")) achievements.push("healthyStreak");
-      if (newStreak >= 7 && !achievements.includes("sevenDayStreak")) achievements.push("sevenDayStreak");
+    let controls;
+    let cancelled = false;
 
-      return {
-        totalScans: prev.totalScans + 1,
-        points,
-        streak: newStreak,
-        lastScanDate: today,
-        achievements: [...new Set(achievements)],
-        topScore: Math.max(prev.topScore, score)
-      };
+    async function startScanner() {
+      setScannerStatus("Opening camera. If it does not read, use manual search.");
+      setError("");
+      lockRef.current = false;
+
+      try {
+        if (!navigator.mediaDevices?.getUserMedia || !videoRef.current) {
+          setScannerStatus("Camera not available. Use manual search.");
+          return;
+        }
+
+        const reader = new BrowserMultiFormatReader();
+        let deviceId;
+
+        try {
+          const devices = await BrowserMultiFormatReader.listVideoInputDevices();
+          const back = devices.find((d) => String(d.label).toLowerCase().includes("back")) || devices[devices.length - 1];
+          deviceId = back?.deviceId;
+        } catch {
+          deviceId = undefined;
+        }
+
+        controls = await reader.decodeFromVideoDevice(deviceId, videoRef.current, (result, scanError, scannerControls) => {
+          if (cancelled || lockRef.current) return;
+
+          if (result) {
+            const barcode = result.getText();
+            if (barcode) {
+              lockRef.current = true;
+              setScannerStatus(`Found ${barcode}`);
+              scannerControls?.stop();
+              searchProduct(barcode);
+            }
+          }
+        });
+
+        setScannerStatus("Point at barcode. Hold steady for 2 seconds.");
+      } catch {
+        setScannerStatus("Camera scanner could not start. Use manual search.");
+      }
+    }
+
+    startScanner();
+
+    return () => {
+      cancelled = true;
+      lockRef.current = false;
+      controls?.stop?.();
+
+      if (videoRef.current?.srcObject) {
+        videoRef.current.srcObject.getTracks().forEach((track) => track.stop());
+      }
+    };
+  }, [screen, scannerKey]);
+
+  function toggleFavorite(product) {
+    if (!product) return;
+
+    setFavorites((prev) => {
+      const exists = prev.some((item) => item.barcode === product.barcode);
+      if (exists) return prev.filter((item) => item.barcode !== product.barcode);
+      return [product, ...prev];
     });
-  };
+  }
 
-  const toggleFavorite = (product) => {
-    const isFav = favorites.some(f => f.code === product.code);
-    if (isFav) {
-      setFavorites(favorites.filter(f => f.code !== product.code));
-    } else {
-      setFavorites([...favorites, product]);
-    }
-  };
+  function addCompare(product) {
+    if (!product) return;
 
-  const clearHistory = () => {
-    if (window.confirm("Clear all scan history?")) {
-      setProducts([]);
-    }
-  };
+    setCompare((prev) => {
+      if (prev.some((item) => item.barcode === product.barcode)) return prev;
+      return [product, ...prev].slice(0, 3);
+    });
 
-  // Home Screen
-  if (screen === "home") {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-white to-teal-50 pb-24">
-        {/* Header */}
-        <div className="sticky top-0 z-10 bg-white shadow-sm">
-          <div className="max-w-md mx-auto px-4 py-4 flex items-center justify-between">
-            <h1 className="text-2xl font-bold text-emerald-600">Pinch</h1>
-            <div className="flex gap-2">
-              <button
-                onClick={() => setScreen("settings")}
-                className="p-2 hover:bg-gray-100 rounded-lg transition-all"
-              >
-                <Bell className="w-5 h-5" />
+    setScreen("compare");
+  }
+
+  return (
+    <div className="app-shell">
+      {screen !== "scanner" && (
+        <header className="topbar">
+          <div>
+            <p className="eyebrow">Pinch</p>
+            <h1>{screenTitle(screen)}</h1>
+          </div>
+
+          <button className="icon-btn" onClick={() => setScreen("settings")} aria-label="Settings">
+            <SlidersHorizontal size={20} />
+          </button>
+        </header>
+      )}
+
+      {screen === "home" && (
+        <main className="page">
+          <section className="hero-card">
+            <div className="logo-bubble">P</div>
+            <h2>Scan smarter. Shop prettier.</h2>
+            <p>Understand food, beauty, and personal care products with clear scores, alerts, and better alternatives.</p>
+
+            <div className="hero-actions">
+              <button className="primary-btn" onClick={() => setScreen("search")}>
+                <Search size={20} />
+                Search product
+              </button>
+
+              <button className="secondary-btn" onClick={() => setScreen("scanner")}>
+                <Camera size={20} />
+                Open camera
               </button>
             </div>
-          </div>
-        </div>
+          </section>
 
-        {/* Gamification Stats */}
-        <div className="max-w-md mx-auto px-4 py-6">
-          <div className="bg-gradient-to-r from-emerald-500 to-teal-500 rounded-2xl p-6 text-white shadow-lg mb-6 transform hover:scale-105 transition-transform">
-            <div className="grid grid-cols-3 gap-4 text-center">
-              <div>
-                <div className="text-3xl font-bold">{stats.points}</div>
-                <div className="text-sm opacity-90">Points</div>
-              </div>
-              <div>
-                <div className="text-3xl font-bold flex items-center justify-center gap-1">
-                  {stats.streak}
-                  <Flame className="w-6 h-6 text-orange-300" />
-                </div>
-                <div className="text-sm opacity-90">Streak</div>
-              </div>
-              <div>
-                <div className="text-3xl font-bold">{stats.totalScans}</div>
-                <div className="text-sm opacity-90">Scans</div>
-              </div>
-            </div>
+          <section className="story-strip">
+            {[["Food", "🍝"], ["Beauty", "🧴"], ["Snacks", "🍪"], ["Drinks", "🥤"], ["Protein", "💪"], ["Avoid", "⚠️"]].map(([label, emoji]) => (
+              <button key={label} className="story-pill" onClick={() => setScreen("search")}>
+                <span>{emoji}</span>
+                {label}
+              </button>
+            ))}
+          </section>
+
+          <section className="feature-grid">
+            <FeatureCard icon={<Apple />} title="Food analysis" text="Nutrition, additives, labels, sugar, salt, protein, and fibre." />
+            <FeatureCard icon={<ShieldCheck />} title="Cosmetic analysis" text="Ingredient concerns, fragrance, irritants, and safer choices." />
+            <FeatureCard icon={<Sparkles />} title="Recommendations" text="Better alternatives when a product scores poorly." />
+            <FeatureCard icon={<Clock />} title="History" text="Colour-coded products you already scanned." />
+          </section>
+
+          <SectionHeader title="Popular products" action="See all" onAction={() => setScreen("search")} />
+
+          <div className="product-carousel">
+            {DEMO_PRODUCTS.slice(0, 8).map((item) => {
+              const product = scoreProduct(toProduct(item), item.barcode);
+              return <ProductMini key={item.barcode} product={product} onClick={() => openProduct(product)} />;
+            })}
           </div>
 
-          {/* Achievements */}
-          {stats.achievements.length > 0 && (
-            <div className="mb-6 p-4 bg-yellow-50 border-2 border-yellow-200 rounded-xl">
-              <p className="text-sm font-bold text-yellow-900 mb-3">🎉 Achievements</p>
-              <div className="flex flex-wrap gap-2">
-                {stats.achievements.map(ach => {
-                  const achievement = ACHIEVEMENTS[ach];
-                  return (
-                    <div key={ach} className="bg-white px-3 py-1 rounded-full text-sm font-semibold border border-yellow-300">
-                      {achievement.icon} {achievement.name}
-                    </div>
-                  );
-                })}
+          {history.length > 0 && (
+            <>
+              <SectionHeader title="Recently scanned" action="History" onAction={() => setScreen("history")} />
+
+              <div className="list-stack">
+                {history.slice(0, 3).map((item) => (
+                  <ProductRow key={item.barcode} product={item} onClick={() => openProduct(item)} />
+                ))}
               </div>
-            </div>
+            </>
           )}
+        </main>
+      )}
 
-          {/* Main Actions */}
-          <div className="space-y-3 mb-6">
-            <button
-              onClick={() => {
-                setVideoActive(true);
-                setScreen("scanner");
+      {screen === "search" && (
+        <main className="page">
+          <BackButton onClick={() => setScreen("home")} />
+
+          <section className="search-card">
+            <h2>Search or enter barcode</h2>
+            <p>Manual search is the most reliable MVP flow. Try a barcode, product name, or tap a product below.</p>
+
+            <form
+              className="search-form"
+              onSubmit={(event) => {
+                event.preventDefault();
+                searchProduct(query);
               }}
-              className="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-4 rounded-xl font-bold flex items-center justify-center gap-3 shadow-lg active:scale-95 transition-all"
             >
-              <Camera className="w-5 h-5" />
-              Scan Product
-            </button>
+              <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Try 5201083348903, Nutella, yogurt..." inputMode="search" />
+              <button disabled={loading}>{loading ? "Searching..." : "Search"}</button>
+            </form>
 
-            <button
-              onClick={() => setScreen("search")}
-              className="w-full bg-white border-2 border-emerald-600 text-emerald-600 py-4 rounded-xl font-bold hover:bg-emerald-50 active:scale-95 transition-all"
-            >
-              Manual Search
-            </button>
+            {error && <div className="error-box">{error}</div>}
+          </section>
+
+          <div className="filter-cloud">
+            {["All", "Food", "Beauty", "Drinks", "Snacks", "Protein", "Low sugar"].map((item) => (
+              <button key={item}>{item}</button>
+            ))}
           </div>
 
-          {/* Recent Scans */}
-          {products.length > 0 && (
-            <div className="mb-6">
-              <div className="flex items-center justify-between mb-3">
-                <h2 className="font-bold text-lg">Recent Scans</h2>
-                <button onClick={() => setScreen("history")} className="text-emerald-600 text-sm font-semibold">
-                  View All →
-                </button>
-              </div>
-              <div className="space-y-2">
-                {products.slice(0, 3).map((product, idx) => {
-                  const score = product.calculatedScore;
-                  const scoreInfo = getScoreColor(score);
-                  return (
-                    <button
-                      key={idx}
-                      onClick={() => {
-                        setCurrentProduct(product);
-                        setScreen("result");
-                      }}
-                      className="w-full bg-white p-3 rounded-lg flex items-center justify-between hover:shadow-md transition-all"
-                    >
-                      <div className="text-left flex-1">
-                        <p className="font-semibold text-sm line-clamp-1">{product.product_name}</p>
-                        <p className="text-xs text-gray-500">{product.brands}</p>
-                      </div>
-                      <div className="text-right ml-2">
-                        <div className="text-2xl font-bold" style={{ color: scoreInfo.color }}>
-                          {scoreInfo.emoji}
-                        </div>
-                        <p className="text-xs font-semibold">{score}</p>
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
-          {/* Quick Navigation */}
-          <div className="grid grid-cols-2 gap-3">
-            <button
-              onClick={() => setScreen("favorites")}
-              className="bg-white p-4 rounded-lg text-center hover:shadow-md transition-all"
-            >
-              <Heart className="w-6 h-6 mx-auto mb-2 text-red-500" />
-              <p className="font-semibold text-sm">{favorites.length} Favorites</p>
-            </button>
-            <button
-              onClick={() => setScreen("achievements")}
-              className="bg-white p-4 rounded-lg text-center hover:shadow-md transition-all"
-            >
-              <Award className="w-6 h-6 mx-auto mb-2 text-yellow-500" />
-              <p className="font-semibold text-sm">{stats.achievements.length} Badges</p>
-            </button>
+          <div className="grid-products">
+            {DEMO_PRODUCTS.map((item) => {
+              const product = scoreProduct(toProduct(item), item.barcode);
+              return <ProductTile key={item.barcode} product={product} onClick={() => searchProduct(item.barcode, item)} />;
+            })}
           </div>
-        </div>
-      </div>
-    );
-  }
+        </main>
+      )}
 
-  // Scanner Screen
-  if (screen === "scanner") {
-    return (
-      <div className="min-h-screen bg-black flex flex-col">
-        <div className="flex-1 relative bg-gray-900 overflow-hidden">
-          <video
-            ref={videoRef}
-            className="w-full h-full object-cover"
-            autoPlay
-            playsInline
-          />
-          <div className="absolute inset-0 flex items-center justify-center">
-            <div className="w-64 h-48 border-4 border-emerald-400 rounded-lg opacity-50 animate-pulse"></div>
-          </div>
-        </div>
-
-        <div className="bg-black p-4 border-t border-gray-800 space-y-3">
-          <input
-            type="text"
-            value={searchBarcode}
-            onChange={(e) => setSearchBarcode(e.target.value)}
-            placeholder="Or enter barcode..."
-            className="w-full px-4 py-3 rounded-lg bg-gray-800 text-white border border-gray-700"
-            onKeyPress={(e) => {
-              if (e.key === "Enter") {
-                fetchProduct(searchBarcode);
-                setSearchBarcode("");
-              }
-            }}
-          />
-
-          <button
-            onClick={() => {
-              setScreen("home");
-              setVideoActive(false);
-            }}
-            className="w-full bg-gray-800 text-white py-3 rounded-lg font-semibold hover:bg-gray-700"
-          >
-            Back
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  // Result Screen
-  if (screen === "result" && currentProduct) {
-    const score = currentProduct.calculatedScore;
-    const scoreInfo = getScoreColor(score);
-    const isFav = favorites.some(f => f.code === currentProduct.code);
-
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-white to-blue-50 pb-24">
-        {/* Header */}
-        <div className="bg-white shadow-sm sticky top-0 z-10">
-          <div className="max-w-md mx-auto px-4 py-4 flex items-center justify-between">
-            <button
-              onClick={() => setScreen("home")}
-              className="flex items-center gap-2 text-emerald-600 font-semibold hover:bg-gray-100 px-2 py-1 rounded"
-            >
-              <ArrowLeft className="w-5 h-5" />
-              Back
+      {screen === "scanner" && (
+        <main className="scanner-page">
+          <div className="scanner-video-wrap">
+            <video ref={videoRef} autoPlay playsInline muted className="scanner-video" />
+            <div className="scanner-frame" />
+            <button className="scanner-close" onClick={() => setScreen("home")}>
+              <X size={22} />
             </button>
-          </div>
-        </div>
 
-        <div className="max-w-md mx-auto px-4 py-6">
-          {/* Score Card */}
-          <div
-            className="rounded-3xl p-8 text-center mb-6 shadow-lg transform hover:scale-105 transition-transform"
-            style={{ backgroundColor: scoreInfo.color + "20", borderColor: scoreInfo.color, borderWidth: "3px" }}
-          >
-            <div className="text-6xl mb-4">{scoreInfo.emoji}</div>
-            <div className="text-5xl font-bold mb-2" style={{ color: scoreInfo.color }}>
-              {score}
-            </div>
-            <div className="text-xl font-bold" style={{ color: scoreInfo.color }}>
-              {scoreInfo.label}
+            <div className="scanner-caption">
+              <h2>Point at barcode</h2>
+              <p>{scannerStatus}</p>
             </div>
           </div>
 
-          {/* Product Info */}
-          <div className="bg-white rounded-xl p-4 mb-4 shadow-sm">
-            <h2 className="text-lg font-bold">{currentProduct.product_name}</h2>
-            <p className="text-sm text-gray-600">{currentProduct.brands}</p>
-          </div>
-
-          {/* Nutrition */}
-          {currentProduct.nutriments && (
-            <div className="bg-white rounded-xl p-4 mb-4 shadow-sm">
-              <h3 className="font-bold mb-3">Nutrition (per 100g)</h3>
-              <div className="grid grid-cols-2 gap-3 text-sm">
-                <div className="bg-emerald-50 p-2 rounded">
-                  <p className="text-gray-600">Energy</p>
-                  <p className="font-bold text-emerald-700">{currentProduct.nutriments["energy-kcal_100g"]} kcal</p>
-                </div>
-                <div className="bg-red-50 p-2 rounded">
-                  <p className="text-gray-600">Sugar</p>
-                  <p className="font-bold text-red-700">{currentProduct.nutriments.sugars_100g}g</p>
-                </div>
-                <div className="bg-amber-50 p-2 rounded">
-                  <p className="text-gray-600">Fat</p>
-                  <p className="font-bold text-amber-700">{currentProduct.nutriments["saturated-fat_100g"]}g</p>
-                </div>
-                <div className="bg-blue-50 p-2 rounded">
-                  <p className="text-gray-600">Protein</p>
-                  <p className="font-bold text-blue-700">{currentProduct.nutriments.proteins_100g}g</p>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Actions */}
-          <div className="flex gap-3 mb-6">
-            <button
-              onClick={() => toggleFavorite(currentProduct)}
-              className={`flex-1 py-3 rounded-lg font-semibold flex items-center justify-center gap-2 transition-all ${
-                isFav
-                  ? "bg-red-100 text-red-700"
-                  : "bg-white text-gray-700 border border-gray-300"
-              }`}
+          <section className="scanner-panel">
+            <form
+              className="search-form dark"
+              onSubmit={(event) => {
+                event.preventDefault();
+                searchProduct(query);
+              }}
             >
-              <Heart className={`w-5 h-5 ${isFav ? "fill-current" : ""}`} />
-              {isFav ? "Saved" : "Save"}
-            </button>
-            <button
-              onClick={() => setScreen("home")}
-              className="flex-1 py-3 rounded-lg font-semibold bg-emerald-600 text-white hover:bg-emerald-700 transition-all"
-            >
-              Next Scan
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
+              <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Or enter barcode..." inputMode="numeric" />
+              <button disabled={loading || !query.trim()}>{loading ? "Searching..." : "Search"}</button>
+            </form>
 
-  // Favorites Screen
-  if (screen === "favorites") {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-white to-blue-50 pb-20">
-        <div className="bg-white shadow-sm sticky top-0 z-10">
-          <div className="max-w-md mx-auto px-4 py-4 flex items-center justify-between">
-            <button
-              onClick={() => setScreen("home")}
-              className="flex items-center gap-2 text-emerald-600 font-semibold"
-            >
-              <ArrowLeft className="w-5 h-5" />
-              Back
+            <button className="restart-btn" onClick={() => setScannerKey((key) => key + 1)}>
+              <RefreshCcw size={18} />
+              Restart camera
             </button>
-            <h1 className="text-lg font-bold">Favorites</h1>
-            <div></div>
-          </div>
-        </div>
 
-        <div className="max-w-md mx-auto px-4 py-6">
-          {favorites.length === 0 ? (
-            <div className="text-center py-12">
-              <Heart className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-              <p className="text-gray-500">No favorites yet</p>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {favorites.map((product, idx) => (
-                <button
-                  key={idx}
-                  onClick={() => {
-                    setCurrentProduct(product);
-                    setScreen("result");
-                  }}
-                  className="w-full bg-white p-4 rounded-lg flex items-center justify-between hover:shadow-md transition-all"
-                >
-                  <div className="text-left flex-1">
-                    <p className="font-semibold">{product.product_name}</p>
-                    <p className="text-sm text-gray-500">{product.brands}</p>
-                  </div>
-                  <Heart className="w-5 h-5 text-red-500 fill-current" />
+            <div className="scanner-products">
+              {DEMO_PRODUCTS.slice(0, 8).map((item) => (
+                <button key={item.barcode} onClick={() => searchProduct(item.barcode, item)}>
+                  <span>{item.emoji}</span>
+                  {item.shortName}
                 </button>
               ))}
             </div>
-          )}
-        </div>
-      </div>
-    );
-  }
+          </section>
+        </main>
+      )}
 
-  // Achievements Screen
-  if (screen === "achievements") {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-white to-blue-50 pb-20">
-        <div className="bg-white shadow-sm sticky top-0 z-10">
-          <div className="max-w-md mx-auto px-4 py-4 flex items-center justify-between">
-            <button
-              onClick={() => setScreen("home")}
-              className="flex items-center gap-2 text-emerald-600 font-semibold"
-            >
-              <ArrowLeft className="w-5 h-5" />
-              Back
-            </button>
-            <h1 className="text-lg font-bold">Achievements</h1>
-            <div></div>
-          </div>
-        </div>
+      {screen === "result" && currentProduct && (
+        <main className="page result-page">
+          <BackButton onClick={() => setScreen("home")} />
 
-        <div className="max-w-md mx-auto px-4 py-6">
-          <div className="grid grid-cols-2 gap-4">
-            {Object.entries(ACHIEVEMENTS).map(([key, achievement]) => {
-              const isUnlocked = stats.achievements.includes(key);
-              return (
-                <div
-                  key={key}
-                  className={`p-4 rounded-xl text-center border-2 transition-all ${
-                    isUnlocked
-                      ? "bg-yellow-50 border-yellow-400 shadow-lg"
-                      : "bg-gray-100 border-gray-300 opacity-50"
-                  }`}
-                >
-                  <div className="text-4xl mb-2">{achievement.icon}</div>
-                  <p className="font-bold text-sm">{achievement.name}</p>
-                  <p className="text-xs text-gray-600 mt-1">+{achievement.points} pts</p>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // History Screen
-  if (screen === "history") {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-white to-blue-50 pb-20">
-        <div className="bg-white shadow-sm sticky top-0 z-10">
-          <div className="max-w-md mx-auto px-4 py-4 flex items-center justify-between">
-            <button
-              onClick={() => setScreen("home")}
-              className="flex items-center gap-2 text-emerald-600 font-semibold"
-            >
-              <ArrowLeft className="w-5 h-5" />
-              Back
-            </button>
-            <h1 className="text-lg font-bold">History</h1>
-            <button
-              onClick={clearHistory}
-              className="p-2 hover:bg-red-100 rounded-lg text-red-600 transition-all"
-            >
-              <Trash2 className="w-5 h-5" />
-            </button>
-          </div>
-        </div>
-
-        <div className="max-w-md mx-auto px-4 py-6">
-          {products.length === 0 ? (
-            <div className="text-center py-12">
-              <History className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-              <p className="text-gray-500">No scan history</p>
+          <section className={`result-hero ${getScoreMeta(currentProduct.score).tone}`}>
+            <div className="product-image-card">
+              {currentProduct.image_url ? <img src={currentProduct.image_url} alt={getName(currentProduct)} /> : <span>{getEmoji(currentProduct)}</span>}
             </div>
-          ) : (
-            <div className="space-y-3">
-              {products.map((product, idx) => {
-                const score = product.calculatedScore;
-                const scoreInfo = getScoreColor(score);
-                return (
-                  <button
-                    key={idx}
-                    onClick={() => {
-                      setCurrentProduct(product);
-                      setScreen("result");
-                    }}
-                    className="w-full bg-white p-4 rounded-lg flex items-center justify-between hover:shadow-md transition-all"
-                  >
-                    <div className="text-left flex-1">
-                      <p className="font-semibold text-sm">{product.product_name}</p>
-                      <p className="text-xs text-gray-500">{product.brands}</p>
-                    </div>
-                    <div className="text-2xl font-bold" style={{ color: scoreInfo.color }}>
-                      {scoreInfo.emoji}
-                    </div>
-                  </button>
-                );
-              })}
+
+            <div className="score-orb" style={{ backgroundColor: getScoreMeta(currentProduct.score).color }}>
+              <strong>{currentProduct.score}</strong>
+              <small>/100</small>
             </div>
-          )}
-        </div>
-      </div>
-    );
-  }
 
-  // Search Screen
-  if (screen === "search") {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-white to-blue-50 pb-20">
-        <div className="bg-white shadow-sm sticky top-0 z-10">
-          <div className="max-w-md mx-auto px-4 py-4 flex items-center gap-3">
-            <button
-              onClick={() => setScreen("home")}
-              className="text-emerald-600"
-            >
-              <ArrowLeft className="w-5 h-5" />
-            </button>
-            <input
-              type="text"
-              value={searchBarcode}
-              onChange={(e) => setSearchBarcode(e.target.value)}
-              onKeyPress={(e) => {
-                if (e.key === "Enter") {
-                  fetchProduct(searchBarcode);
-                  setSearchBarcode("");
-                }
-              }}
-              placeholder="Enter barcode..."
-              className="flex-1 px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
-              autoFocus
-            />
-          </div>
-        </div>
-
-        <div className="max-w-md mx-auto px-4 py-6">
-          <button
-            onClick={() => {
-              if (searchBarcode) {
-                fetchProduct(searchBarcode);
-                setSearchBarcode("");
-              }
-            }}
-            className="w-full bg-emerald-600 text-white py-3 rounded-lg font-bold mb-6"
-          >
-            Search
-          </button>
-
-          {loading && <p className="text-center text-gray-600">Loading...</p>}
-          {error && <p className="text-center text-red-600">{error}</p>}
-        </div>
-      </div>
-    );
-  }
-
-  // Settings Screen
-  if (screen === "settings") {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-white to-blue-50 pb-20">
-        <div className="bg-white shadow-sm sticky top-0 z-10">
-          <div className="max-w-md mx-auto px-4 py-4 flex items-center justify-between">
-            <button
-              onClick={() => setScreen("home")}
-              className="flex items-center gap-2 text-emerald-600 font-semibold"
-            >
-              <ArrowLeft className="w-5 h-5" />
-              Back
-            </button>
-            <h1 className="text-lg font-bold">Settings</h1>
-            <div></div>
-          </div>
-        </div>
-
-        <div className="max-w-md mx-auto px-4 py-6">
-          <div className="bg-white rounded-xl p-4 shadow-sm">
-            <h3 className="font-bold mb-4">About Pinch</h3>
-            <p className="text-sm text-gray-600 mb-4">
-              Pinch is an independent product transparency scanner. Scan barcodes to understand ingredients, nutrition, and allergens.
+            <p className="brand">{getBrand(currentProduct)}</p>
+            <h2>{getFullName(currentProduct)}</h2>
+            <p className="score-label">
+              {getScoreMeta(currentProduct.score).label} · {currentProduct.productKind === "food" ? "Food analysis" : "Cosmetic analysis"}
             </p>
-            <p className="text-xs text-gray-500">Version 1.0.0</p>
-          </div>
-        </div>
-      </div>
-    );
-  }
+          </section>
 
-  return null;
+          {currentProduct.alerts?.length > 0 && (
+            <section className="alert-card">
+              <AlertTriangle size={20} />
+              <div>
+                <h3>Your alerts</h3>
+                {currentProduct.alerts.map((item) => (
+                  <p key={item}>• {item}</p>
+                ))}
+              </div>
+            </section>
+          )}
+
+          <nav className="tabs">
+            {["overview", "nutrition", "ingredients", "alternatives"].map((item) => (
+              <button key={item} className={tab === item ? "active" : ""} onClick={() => setTab(item)}>
+                {item}
+              </button>
+            ))}
+          </nav>
+
+          {tab === "overview" && (
+            <section className="content-card">
+              <h3>Why this score?</h3>
+              <p className="muted">Pinch evaluates the product using available label data. Food scoring checks nutrition, additives, and labels. Cosmetic scoring checks ingredient concerns.</p>
+
+              {currentProduct.productKind === "food" && (
+                <div className="score-breakdown">
+                  <Breakdown label="Nutrition" value={currentProduct.scoreParts.nutrition} max={60} />
+                  <Breakdown label="Additives" value={currentProduct.scoreParts.additives} max={30} />
+                  <Breakdown label="Labels" value={currentProduct.scoreParts.organic} max={10} />
+                </div>
+              )}
+
+              <SignalList title="What hurt the score" items={currentProduct.warnings} type="bad" />
+              <SignalList title="What helped the score" items={currentProduct.positives} type="good" />
+            </section>
+          )}
+
+          {tab === "nutrition" && (
+            <section className="content-card">
+              <h3>Nutrition per 100g</h3>
+              {currentProduct.productKind === "food" ? (
+                <div className="metric-grid">
+                  <Metric label="Calories" value={`${Math.round(getKcal(currentProduct))} kcal`} />
+                  <Metric label="Sugar" value={`${getSugar(currentProduct).toFixed(1)}g`} />
+                  <Metric label="Sat fat" value={`${getSatFat(currentProduct).toFixed(1)}g`} />
+                  <Metric label="Salt" value={`${getSalt(currentProduct).toFixed(2)}g`} />
+                  <Metric label="Protein" value={`${getProtein(currentProduct).toFixed(1)}g`} />
+                  <Metric label="Fibre" value={`${getFibre(currentProduct).toFixed(1)}g`} />
+                </div>
+              ) : (
+                <p className="muted">Nutrition does not apply to cosmetic or hygiene products.</p>
+              )}
+            </section>
+          )}
+
+          {tab === "ingredients" && (
+            <section className="content-card">
+              <h3>Ingredients</h3>
+              <p className="ingredient-text">{currentProduct.ingredients_text || "No ingredient list available."}</p>
+              <h3 className="spaced">Additives</h3>
+
+              {(currentProduct.additives_tags || []).length > 0 ? (
+                <div className="additive-list">
+                  {currentProduct.additives_tags.map((tag) => {
+                    const key = normalizeAdditive(tag);
+                    const additive = ADDITIVES[key];
+
+                    return (
+                      <div key={tag} className={`additive ${additive?.risk || "unknown"}`}>
+                        <strong>
+                          {key.toUpperCase()} {additive ? `· ${additive.name}` : ""}
+                        </strong>
+                        <span>{additive?.reason || "Not classified in prototype database."}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <p className="muted">No additives listed in available data.</p>
+              )}
+            </section>
+          )}
+
+          {tab === "alternatives" && (
+            <section className="content-card">
+              <h3>Healthier alternatives</h3>
+              <p className="muted">Independent recommendations based on higher scores and similar product type.</p>
+
+              {recommendations.length > 0 ? (
+                <div className="list-stack">
+                  {recommendations.map((item) => (
+                    <ProductRow key={item.barcode} product={item} onClick={() => openProduct(item)} />
+                  ))}
+                </div>
+              ) : (
+                <p className="muted">No better demo alternatives available yet.</p>
+              )}
+            </section>
+          )}
+
+          <section className="action-bar">
+            <button onClick={() => toggleFavorite(currentProduct)} className={isFavorite ? "saved" : ""}>
+              <Heart size={19} />
+              {isFavorite ? "Saved" : "Save"}
+            </button>
+
+            <button onClick={() => addCompare(currentProduct)}>
+              <Star size={19} />
+              Compare
+            </button>
+
+            <button onClick={() => setScreen("recommendations")}>
+              <Sparkles size={19} />
+              Recs
+            </button>
+          </section>
+        </main>
+      )}
+
+      {screen === "history" && (
+        <main className="page">
+          <BackButton onClick={() => setScreen("home")} />
+          <section className="content-card intro">
+            <h2>History</h2>
+            <p>Pinch remembers scanned products with easy colour-coded scores.</p>
+          </section>
+
+          {history.length === 0 ? <EmptyState text="No scans yet." /> : <div className="list-stack">{history.map((item) => <ProductRow key={item.barcode} product={item} onClick={() => openProduct(item)} />)}</div>}
+        </main>
+      )}
+
+      {screen === "recommendations" && (
+        <main className="page">
+          <BackButton onClick={() => setScreen("home")} />
+          <section className="content-card intro">
+            <h2>Recommendations</h2>
+            <p>Better alternatives based on higher scores, not paid placement.</p>
+          </section>
+
+          <div className="grid-products">{getRecommendations(currentProduct).map((item) => <ProductTile key={item.barcode} product={item} onClick={() => openProduct(item)} />)}</div>
+        </main>
+      )}
+
+      {screen === "settings" && (
+        <main className="page">
+          <BackButton onClick={() => setScreen("home")} />
+          <section className="content-card intro">
+            <h2>Personal alerts</h2>
+            <p>Pinch separates general product score from what matters personally to you.</p>
+          </section>
+
+          <PreferenceEditor title="Avoid ingredients" values={["palm oil", "parfum", "bht", "sugar", "gluten"]} selected={preferences.avoid} onToggle={(value) => setPreferences((prev) => toggleArray(prev, "avoid", value))} />
+          <PreferenceEditor title="Allergens" values={["milk", "peanuts", "gluten", "soy", "eggs", "tree nuts"]} selected={preferences.allergens} onToggle={(value) => setPreferences((prev) => toggleArray(prev, "allergens", value))} />
+        </main>
+      )}
+
+      {screen === "compare" && (
+        <main className="page">
+          <BackButton onClick={() => setScreen("home")} />
+          <section className="content-card intro">
+            <h2>Compare</h2>
+            <p>Choose up to 3 products and compare scores side by side.</p>
+          </section>
+
+          {compare.length === 0 ? <EmptyState text="No products added to compare yet." /> : <div className="compare-grid">{compare.map((item) => <ProductTile key={item.barcode} product={item} onClick={() => openProduct(item)} />)}</div>}
+        </main>
+      )}
+
+      {screen !== "scanner" && <BottomNav screen={screen} setScreen={setScreen} />}
+    </div>
+  );
+}
+
+function screenTitle(screen) {
+  const titles = {
+    home: "Good choices, fast",
+    search: "Find a product",
+    result: "Product result",
+    history: "Your shelf memory",
+    recommendations: "Better alternatives",
+    settings: "Personal alerts",
+    compare: "Compare"
+  };
+
+  return titles[screen] || "Pinch";
+}
+
+function BackButton({ onClick }) {
+  return (
+    <button className="back-btn" onClick={onClick}>
+      <ChevronLeft size={20} />
+      Back
+    </button>
+  );
+}
+
+function SectionHeader({ title, action, onAction }) {
+  return (
+    <div className="section-header">
+      <h3>{title}</h3>
+      {action && <button onClick={onAction}>{action}</button>}
+    </div>
+  );
+}
+
+function FeatureCard({ icon, title, text }) {
+  return (
+    <div className="feature-card">
+      <div className="feature-icon">{icon}</div>
+      <h3>{title}</h3>
+      <p>{text}</p>
+    </div>
+  );
+}
+
+function ProductMini({ product, onClick }) {
+  const meta = getScoreMeta(product.score);
+
+  return (
+    <button className="mini-card" onClick={onClick}>
+      <span className="mini-emoji">{getEmoji(product)}</span>
+      <strong>{getName(product)}</strong>
+      <small>{getBrand(product)}</small>
+      <span className={`mini-score ${meta.tone}`}>{product.score}</span>
+    </button>
+  );
+}
+
+function ProductTile({ product, onClick }) {
+  const meta = getScoreMeta(product.score);
+
+  return (
+    <button className="product-tile" onClick={onClick}>
+      <span className="tile-emoji">{getEmoji(product)}</span>
+      <div>
+        <strong>{getName(product)}</strong>
+        <small>{getBrand(product)}</small>
+      </div>
+      <span className={`tile-score ${meta.tone}`}>{product.score}</span>
+    </button>
+  );
+}
+
+function ProductRow({ product, onClick }) {
+  const meta = getScoreMeta(product.score);
+
+  return (
+    <button className="product-row" onClick={onClick}>
+      <div className="row-emoji">{getEmoji(product)}</div>
+      <div className="row-info">
+        <strong>{getName(product)}</strong>
+        <small>
+          {getBrand(product)} · {meta.label}
+        </small>
+      </div>
+      <span className={`row-score ${meta.tone}`}>{product.score}</span>
+      <ChevronRight size={16} />
+    </button>
+  );
+}
+
+function Breakdown({ label, value, max }) {
+  const width = max ? `${Math.round((value / max) * 100)}%` : "0%";
+
+  return (
+    <div className="breakdown">
+      <div>
+        <span>{label}</span>
+        <strong>
+          {value}/{max}
+        </strong>
+      </div>
+      <div className="break-track">
+        <div style={{ width }} />
+      </div>
+    </div>
+  );
+}
+
+function SignalList({ title, items, type }) {
+  if (!items || items.length === 0) return null;
+
+  return (
+    <div className={`signal-list ${type}`}>
+      <h4>{title}</h4>
+      {items.map((item) => (
+        <p key={item}>• {item}</p>
+      ))}
+    </div>
+  );
+}
+
+function Metric({ label, value }) {
+  return (
+    <div className="metric">
+      <span>{label}</span>
+      <strong>{value}</strong>
+    </div>
+  );
+}
+
+function PreferenceEditor({ title, values, selected, onToggle }) {
+  return (
+    <section className="content-card">
+      <h3>{title}</h3>
+      <div className="preference-cloud">
+        {values.map((value) => (
+          <button key={value} className={selected.includes(value) ? "selected" : ""} onClick={() => onToggle(value)}>
+            {value}
+          </button>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function EmptyState({ text }) {
+  return (
+    <section className="empty-state">
+      <Sparkles size={28} />
+      <p>{text}</p>
+    </section>
+  );
+}
+
+function BottomNav({ screen, setScreen }) {
+  const items = [
+    ["home", Home, "Home"],
+    ["search", Search, "Search"],
+    ["history", Clock, "History"],
+    ["recommendations", Leaf, "Recs"],
+    ["settings", SlidersHorizontal, "Alerts"]
+  ];
+
+  return (
+    <nav className="bottom-nav">
+      {items.map(([id, Icon, label]) => (
+        <button key={id} className={screen === id ? "active" : ""} onClick={() => setScreen(id)}>
+          <Icon size={20} />
+          <span>{label}</span>
+        </button>
+      ))}
+    </nav>
+  );
 }
